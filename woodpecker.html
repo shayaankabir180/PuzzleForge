@@ -63,12 +63,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
   grid-template-columns:repeat(8,minmax(0,1fr));
   grid-template-rows:repeat(8,minmax(0,1fr));
   border:3px solid #343c49;border-radius:6px;overflow:hidden;
-  user-select:none;touch-action:manipulation;
+  user-select:none;
+  touch-action:none;
 }
 .square{
   width:100%;height:100%;min-width:0;min-height:0;
   display:flex;align-items:center;justify-content:center;
   position:relative;cursor:pointer;user-select:none;
+  -webkit-user-select:none;
 }
 .light{background:#e5e1d5}
 .dark{background:#789477}
@@ -84,9 +86,28 @@ button:disabled{opacity:.45;cursor:not-allowed}
   display:block;
   pointer-events:none;
   user-select:none;
+  -webkit-user-drag:none;
   position:relative;
   z-index:2;
   filter:drop-shadow(0 1px 1px rgba(0,0,0,.22));
+}
+
+/* Dragging piece */
+.square.drag-origin .piece-image{
+  opacity:.28;
+}
+
+.drag-ghost{
+  position:fixed;
+  width:var(--drag-size,48px);
+  height:var(--drag-size,48px);
+  object-fit:contain;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+  z-index:99999;
+  filter:drop-shadow(0 5px 5px rgba(0,0,0,.4));
+  transform:translate(-50%,-50%);
 }
 
 .square-coordinate{
@@ -458,7 +479,7 @@ function renderHistory(){
     `<div class="history-item">
       <b>Round ${roundHistory.length-i}</b>:
       ${r.time} · ${r.mistakes} mistakes · ${r.count} puzzles
-    </div>`
+      </div>`
   ).join("");
 }
 
@@ -683,12 +704,23 @@ function renderBoard(){
         (r+c)%2===0?"light":"dark"
       );
 
+      square.dataset.square=squareName;
+
       if(selected===squareName){
         square.classList.add("selected");
       }
 
       if(legalTargets.includes(squareName)){
         square.classList.add(piece?"capture":"target");
+      }
+
+      /* Mark the piece's original square during dragging */
+      if(
+        dragState&&
+        dragState.dragging&&
+        dragState.origin===squareName
+      ){
+        square.classList.add("drag-origin");
       }
 
       if(piece){
@@ -732,6 +764,10 @@ function renderBoard(){
       }
 
       square.addEventListener("click",()=>{
+        if(suppressClick){
+          suppressClick=false;
+          return;
+        }
         tapSquare(squareName);
       });
 
@@ -780,6 +816,163 @@ function tapSquare(sq){
       verbose:true
     }).map(m=>m.to);
 
+    renderBoard();
+  }
+}
+
+
+/* ---------------- DRAG AND DROP ---------------- */
+
+/*
+  Pointer Events support both mouse and touch.
+  Existing tap-to-move remains available.
+*/
+
+let dragState=null;
+let suppressClick=false;
+
+function getPieceImage(square){
+  return square?.querySelector(".piece-image")||null;
+}
+
+function createDragGhost(image,x,y){
+  const ghost=document.createElement("img");
+
+  ghost.src=image.src;
+  ghost.className="drag-ghost";
+  ghost.alt="";
+  ghost.draggable=false;
+
+  const boardRect=$("board").getBoundingClientRect();
+  const squareSize=boardRect.width/8;
+
+  ghost.style.setProperty("--drag-size",squareSize+"px");
+  ghost.style.left=x+"px";
+  ghost.style.top=y+"px";
+
+  document.body.appendChild(ghost);
+
+  return ghost;
+}
+
+function moveDragGhost(x,y){
+  if(!dragState||!dragState.ghost)return;
+
+  dragState.ghost.style.left=x+"px";
+  dragState.ghost.style.top=y+"px";
+}
+
+function startDrag(event){
+  if(waiting||!game)return;
+  if(event.button!==undefined&&event.button!==0)return;
+
+  const square=event.target.closest(".square");
+  if(!square)return;
+
+  const sq=square.dataset.square;
+  const piece=game.get(sq);
+
+  if(!piece||piece.color!==game.turn())return;
+
+  const image=getPieceImage(square);
+  if(!image)return;
+
+  dragState={
+    origin:sq,
+    pointerId:event.pointerId,
+    startX:event.clientX,
+    startY:event.clientY,
+    dragging:false,
+    image:image,
+    ghost:null
+  };
+}
+
+function beginActualDrag(event){
+  if(!dragState||dragState.dragging)return;
+
+  dragState.dragging=true;
+
+  selected=dragState.origin;
+
+  legalTargets=game.moves({
+    square:dragState.origin,
+    verbose:true
+  }).map(m=>m.to);
+
+  dragState.ghost=createDragGhost(
+    dragState.image,
+    event.clientX,
+    event.clientY
+  );
+
+  renderBoard();
+}
+
+function handleDragMove(event){
+  if(!dragState||event.pointerId!==dragState.pointerId)return;
+
+  const dx=event.clientX-dragState.startX;
+  const dy=event.clientY-dragState.startY;
+
+  if(!dragState.dragging){
+    if(Math.hypot(dx,dy)<5)return;
+    beginActualDrag(event);
+  }
+
+  moveDragGhost(event.clientX,event.clientY);
+}
+
+function finishDrag(event){
+  if(!dragState||event.pointerId!==dragState.pointerId)return;
+
+  const state=dragState;
+  dragState=null;
+
+  if(!state.dragging){
+    return;
+  }
+
+  suppressClick=true;
+
+  if(state.ghost){
+    state.ghost.remove();
+  }
+
+  const targetElement=document.elementFromPoint(
+    event.clientX,
+    event.clientY
+  );
+
+  const targetSquare=targetElement?.closest(".square");
+  const destination=targetSquare?.dataset.square;
+
+  if(destination&&legalTargets.includes(destination)){
+    /* selected is still the dragged piece's origin */
+    tapSquare(destination);
+  }else{
+    /* Illegal drop: return the piece to its original square */
+    selected=null;
+    legalTargets=[];
+    renderBoard();
+  }
+
+  setTimeout(()=>{
+    suppressClick=false;
+  },0);
+}
+
+function cancelDrag(event){
+  if(!dragState||event.pointerId!==dragState.pointerId)return;
+
+  const state=dragState;
+  dragState=null;
+
+  if(state.dragging){
+    if(state.ghost)state.ghost.remove();
+
+    selected=null;
+    legalTargets=[];
     renderBoard();
   }
 }
@@ -937,6 +1130,15 @@ function finishRound(){
 function endTraining(){
   clearInterval(tick);
 
+  /* Safely remove an active drag ghost if training is ended */
+  if(dragState&&dragState.ghost){
+    dragState.ghost.remove();
+  }
+
+  dragState=null;
+  selected=null;
+  legalTargets=[];
+
   $("training").classList.add("hidden");
   $("roundComplete").classList.add("hidden");
   $("setup").classList.remove("hidden");
@@ -964,6 +1166,15 @@ $("endBtn").addEventListener("click",endTraining);
 
 $("flipBtn").addEventListener("click",flipBoard);
 $("restartBtn").addEventListener("click",restartPuzzle);
+
+
+/* ---------------- DRAG EVENT LISTENERS ---------------- */
+
+$("board").addEventListener("pointerdown",startDrag);
+
+document.addEventListener("pointermove",handleDragMove);
+document.addEventListener("pointerup",finishDrag);
+document.addEventListener("pointercancel",cancelDrag);
 
 
 /* ---------------- INITIALIZATION ---------------- */
