@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PuzzleForge - Puzzle Contriving</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#10131a;color:#f1f3f7;font-family:Arial,sans-serif;padding:16px}
@@ -39,7 +40,13 @@ h1{font-size:30px;margin-bottom:8px}
 .square.hint{background:#e6bd42}
 .square.drag-over{box-shadow:inset 0 0 0 4px rgba(255,255,255,.75)}
 .piece-image{width:92%;height:92%;object-fit:contain;display:block;pointer-events:none;user-select:none;position:relative;z-index:2;filter:drop-shadow(0 1px 1px rgba(0,0,0,.22))}
-.piece-image.drag-origin{opacity:.25}
+
+/* FIX: original piece becomes translucent while dragging */
+.piece-image.drag-origin{
+  opacity:.25 !important;
+  transition:opacity .08s ease;
+}
+
 .drag-ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:9999;object-fit:contain;will-change:transform;filter:drop-shadow(0 8px 10px rgba(0,0,0,.45))}
 .drag-ghost.snap{transition:transform .18s cubic-bezier(.2,.8,.2,1)}
 .square:has(.piece-image){cursor:grab}
@@ -60,6 +67,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .progress-fill{height:100%;width:0%;background:#b6a05a;transition:width .3s}
 .themes{color:#aab4c3;font-size:12px;line-height:1.6;margin-top:12px}
 .note{color:#929baa;font-size:12px;line-height:1.5;margin-top:18px}
+
 @media(max-width:720px){
 .layout{grid-template-columns:1fr}
 body{padding:12px}
@@ -67,7 +75,9 @@ h1{font-size:26px}
 }
 </style>
 </head>
+
 <body>
+
 <header>
   <div>
     <div class="logo">♟ PuzzleForge</div>
@@ -81,6 +91,7 @@ h1{font-size:26px}
 <p class="subtitle">Bobby Fischer: "Chess is life."</p>
 
 <div class="layout">
+
 <section class="card">
   <div class="top-info">
     <strong id="puzzleNumber">Loading puzzles...</strong>
@@ -162,6 +173,7 @@ h1{font-size:26px}
     <br>Stockfish files must be inside the engine folder.
   </p>
 </aside>
+
 </div>
 </div>
 
@@ -176,12 +188,10 @@ const game = new Chess();
 const boardElement = document.getElementById("board");
 const STORAGE_KEY = "puzzleforge_progress_v1";
 
-/* Permanent solved IDs for the currently signed-in account. */
 let cloudSolvedIds = new Set();
 let solvedIdsUserUid = null;
 let solvedIdsLoading = false;
 
-/* Stockfish */
 let stockfishWorker = null;
 let engineReady = false;
 let engineStarting = false;
@@ -317,7 +327,6 @@ window.addEventListener("puzzleforge:auth", event=>{
 
 window.addEventListener("puzzleforge:cloud-synced",()=>{
   updateAccountStatus((window.PF && PF.user) || null);
-
   loadProgress();
   updateStats();
 });
@@ -991,9 +1000,6 @@ function canInteract(){
   return !(puzzleSolved || opponentThinking || wrongMovePending || !currentPuzzle);
 }
 
-/* Attempts from -> to. Returns true if the move was legal and handled
-   (either as the correct puzzle move or as a wrong move). Returns false
-   if the move is illegal, so nothing on the board changes. */
 function tryMove(from,to){
   if(from===to) return false;
 
@@ -1074,7 +1080,6 @@ function tryMove(from,to){
     return true;
   }
 
-  /* Illegal move: nothing happens */
   return false;
 }
 
@@ -1122,9 +1127,9 @@ function selectPiece(square){
 
 /* ---------------- DRAG AND DROP ---------------- */
 
-let drag = null;            // active press/drag state
-let dragRaf = 0;            // pending animation frame for the ghost piece
-const DRAG_THRESHOLD = 4;   // px before a press becomes a drag
+let drag = null;
+let dragRaf = 0;
+const DRAG_THRESHOLD = 4;
 
 function boardGeometry(){
   const rect = boardElement.getBoundingClientRect();
@@ -1135,7 +1140,6 @@ function boardGeometry(){
   };
 }
 
-/* Index of the square (in DOM order) under a screen point, or -1 */
 function squareIndexAt(x,y,geo){
   const g = geo || boardGeometry();
   const c = Math.floor((x-g.left)/g.size);
@@ -1173,7 +1177,6 @@ function scheduleGhost(x,y){
   if(!dragRaf) dragRaf = requestAnimationFrame(paintGhost);
 }
 
-/* Stops tracking the pointer. The ghost is handled by the caller. */
 function endDragTracking(){
   if(!drag) return null;
 
@@ -1196,16 +1199,20 @@ function endDragTracking(){
   return state;
 }
 
-/* Immediate cleanup (new puzzle, flip board, ...) */
+/* Immediate cleanup */
 function cancelDrag(){
   const state = endDragTracking();
   if(!state) return;
 
   if(state.ghost) state.ghost.remove();
-  if(state.originImg) state.originImg.classList.remove("drag-origin");
+
+  if(state.originImg){
+    state.originImg.classList.remove("drag-origin");
+    state.originImg.style.opacity = "";
+  }
 }
 
-/* Smoothly glide the ghost piece back to where it came from */
+/* Smoothly glide the ghost back to its original square */
 function snapBack(state){
   const ghost = state.ghost;
   if(!ghost) return;
@@ -1214,6 +1221,10 @@ function snapBack(state){
 
   if(!originEl){
     ghost.remove();
+    if(state.originImg){
+      state.originImg.classList.remove("drag-origin");
+      state.originImg.style.opacity = "";
+    }
     return;
   }
 
@@ -1227,7 +1238,11 @@ function snapBack(state){
 
   setTimeout(()=>{
     ghost.remove();
-    if(state.originImg) state.originImg.classList.remove("drag-origin");
+
+    if(state.originImg){
+      state.originImg.classList.remove("drag-origin");
+      state.originImg.style.opacity = "";
+    }
   },190);
 }
 
@@ -1255,7 +1270,7 @@ boardElement.addEventListener("pointerdown",event=>{
     y: event.clientY,
     dragging: false,
     hasPiece: !!piece,
-    movable: !!(piece && piece.color===game.turn()),   // only your own pieces can make moves
+    movable: !!(piece && piece.color===game.turn()),
     ghost: null,
     originImg: null,
     overEl: null,
@@ -1269,7 +1284,6 @@ boardElement.addEventListener("pointerdown",event=>{
 
   if(piece) event.preventDefault();
 
-  /* Pressing your own piece selects it and shows its legal squares. */
   if(drag.movable && selected!==square){
     selectPiece(square);
   }
@@ -1286,7 +1300,6 @@ boardElement.addEventListener("pointermove",event=>{
 
     if(Math.hypot(dx,dy)<DRAG_THRESHOLD) return;
 
-    /* Start dragging (works for both colours) */
     const originSquare = boardElement.querySelector('.square[data-square="'+drag.from+'"]');
     const originImg = originSquare ? originSquare.querySelector(".piece-image") : null;
 
@@ -1305,7 +1318,10 @@ boardElement.addEventListener("pointermove",event=>{
     ghost.style.height = size+"px";
     document.body.appendChild(ghost);
 
+    /* FIX: fade the original piece in its original square */
     originImg.classList.add("drag-origin");
+    originImg.style.opacity = "0.25";
+
     document.body.style.cursor = "grabbing";
 
     drag.half = size/2;
@@ -1318,7 +1334,6 @@ boardElement.addEventListener("pointermove",event=>{
 
   scheduleGhost(event.clientX,event.clientY);
 
-  /* Highlight the hovered square only if it is a legal destination for your own piece. */
   let overEl = null;
 
   if(drag.movable){
@@ -1346,19 +1361,20 @@ boardElement.addEventListener("pointerup",event=>{
   const target = idx>=0 ? squareNameFromIndex(idx) : null;
 
   if(state.dragging){
-    /* Legal drop of your own piece: play it. */
+    /* Legal drop */
     if(state.movable && target && target!==state.from && legalTargets.includes(target)){
       state.ghost.remove();
 
-      if(!tryMove(state.from,target)){
+      if(!tryMove(state.from,target){
         state.originImg.classList.remove("drag-origin");
+        state.originImg.style.opacity = "";
         renderBoard();
       }
 
       return;
     }
 
-    /* Anything else: the piece glides back. */
+    /* Invalid drop: glide back */
     snapBack(state);
 
     if(target && target!==state.from){
@@ -1372,7 +1388,7 @@ boardElement.addEventListener("pointerup",event=>{
     return;
   }
 
-  /* Plain click (no drag). Pressing your own piece already selected it. */
+  /* Plain click */
   if(target){
     if(state.movable && target===state.from) return;
     handleClick(target);
@@ -1440,7 +1456,7 @@ async function finishPuzzle(){
 
   const today = localDateKey();
 
-  if(!solvedDates.includes(today)){
+  if(!solvedDates.includes(today){
     solvedDates.push(today);
   }
 
