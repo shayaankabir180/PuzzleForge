@@ -63,7 +63,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .themes{color:#aab4c3;font-size:12px;line-height:1.6;margin-top:12px}
 .note{color:#929baa;font-size:12px;line-height:1.5;margin-top:18px}
 
-/* MOVE NAVIGATION */
 .move-navigation{
   display:flex;
   align-items:center;
@@ -85,49 +84,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
   font-weight:bold;
   min-width:65px;
   text-align:center;
-}
-.move-history{
-  margin-top:12px;
-  padding:12px;
-  background:#222936;
-  border-radius:9px;
-}
-.move-history h4{
-  color:#d7bd70;
-  margin-bottom:10px;
-  font-size:14px;
-}
-.move-list{
-  display:flex;
-  flex-wrap:wrap;
-  gap:7px;
-  max-height:150px;
-  overflow-y:auto;
-}
-.move-item{
-  padding:7px 10px;
-  border-radius:6px;
-  background:#303a4b;
-  color:#dce2eb;
-  font-size:13px;
-  cursor:pointer;
-  border:1px solid transparent;
-}
-.move-item:hover{background:#46546b}
-.move-item.active{
-  background:#b6a05a;
-  color:#111;
-  font-weight:bold;
-}
-.move-empty{
-  color:#929baa;
-  font-size:12px;
-}
-.history-info{
-  color:#929baa;
-  font-size:11px;
-  margin-top:9px;
-  line-height:1.5;
 }
 
 @media(max-width:720px){
@@ -192,23 +148,12 @@ h1{font-size:26px}
     <button class="primary" onclick="nextPuzzle()">Next Puzzle →</button>
   </div>
 
-  <!-- MOVE NAVIGATION -->
   <div class="move-navigation">
     <button id="firstMoveBtn" onclick="goToFirstMove()" title="First Move">|◀</button>
     <button id="previousMoveBtn" onclick="goToPreviousMove()" title="Previous Move">◀</button>
     <span class="move-counter" id="moveCounter">0 / 0</span>
     <button id="nextMoveBtn" onclick="goToNextMove()" title="Next Move">▶</button>
     <button id="lastMoveBtn" onclick="goToLastMove()" title="Last Move">▶|</button>
-  </div>
-
-  <div class="move-history">
-    <h4>Move History</h4>
-    <div class="move-list" id="moveHistory">
-      <span class="move-empty">No moves yet</span>
-    </div>
-    <p class="history-info">
-      Select any move to view that position on the board.
-    </p>
   </div>
 
   <p id="status" class="status">Loading puzzle database...</p>
@@ -261,7 +206,6 @@ h1{font-size:26px}
 </div>
 </div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -313,7 +257,7 @@ let dailySolved = {};
 let wrongMoveTimer = null;
 let wrongMovePreviousLastMove = null;
 
-/* ---------------- MOVE NAVIGATION VARIABLES ---------------- */
+/* ---------------- MOVE NAVIGATION ---------------- */
 
 let moveHistory = [];
 let historyIndex = 0;
@@ -974,7 +918,6 @@ function startPuzzle(index){
   wrongMovePending = false;
   wrongMoveNoticeActive = false;
 
-  /* Reset move navigation */
   moveHistory = [];
   historyIndex = 0;
   viewingHistory = false;
@@ -1017,7 +960,6 @@ function startPuzzle(index){
 
     setMessage("Find the best move!");
 
-    /* Save initial puzzle position after setup move */
     saveMovePosition(null);
 
     renderBoard();
@@ -1029,29 +971,22 @@ function startPuzzle(index){
   }
 }
 
-/* ---------------- MOVE HISTORY SYSTEM ---------------- */
+/* ---------------- MOVE NAVIGATION SYSTEM ---------------- */
 
 function saveMovePosition(move){
 
-  /* Remove future positions if a new branch is created */
   moveHistory = moveHistory.slice(0,historyIndex+1);
 
   moveHistory.push({
     fen:game.fen(),
-
     lastMove:lastMove ? {...lastMove} : null,
-
     puzzleMoveIndex:puzzleMoveIndex,
-
     san:move ? move.san : null,
-
     color:move ? move.color : null,
-
     solved:puzzleSolved
   });
 
   historyIndex = moveHistory.length-1;
-
   viewingHistory = false;
 
   updateMoveNavigation();
@@ -1079,50 +1014,6 @@ function updateMoveNavigation(){
 
   next.disabled = historyIndex>=moveHistory.length-1 || navigationLocked;
   last.disabled = historyIndex>=moveHistory.length-1 || navigationLocked;
-
-  const historyElement = document.getElementById("moveHistory");
-
-  if(!historyElement) return;
-
-  historyElement.innerHTML = "";
-
-  if(moveHistory.length<=1){
-    const empty = document.createElement("span");
-    empty.className = "move-empty";
-    empty.textContent = "No moves yet";
-    historyElement.appendChild(empty);
-    return;
-  }
-
-  moveHistory.forEach((position,index)=>{
-
-    if(index===0) return;
-
-    const item = document.createElement("button");
-
-    item.className = "move-item";
-
-    const moveNumber = Math.floor((index-1)/2)+1;
-
-    item.textContent =
-      (position.color==="w" ? moveNumber+". " :
-       (index===1 ? moveNumber+"... " : ""))+
-      (position.san || "?");
-
-    if(index===historyIndex){
-      item.classList.add("active");
-    }
-
-    item.disabled = navigationLocked;
-
-    item.onclick = ()=>{
-      goToMove(index);
-    };
-
-    historyElement.appendChild(item);
-
-  });
-
 }
 
 function goToMove(index){
@@ -1290,6 +1181,7 @@ function renderBoard(){
   }
 
   updateInfo();
+  updateMoveNavigation();
 }
 
 /* ---------------- MOVE HANDLING ---------------- */
@@ -1306,7 +1198,6 @@ function canInteract(){
 
 function tryMove(from,to){
 
-  /* Do not allow playing from an old history position */
   if(viewingHistory){
     setMessage("Return to the latest move before playing.");
     return false;
@@ -1320,7 +1211,6 @@ function tryMove(from,to){
   const expectedFrom = expected.substring(0,2);
   const expectedTo = expected.substring(2,4);
 
-  /* Correct move */
   if(from===expectedFrom && to===expectedTo){
     const move = game.move({
       from,
@@ -1342,7 +1232,6 @@ function tryMove(from,to){
 
       puzzleMoveIndex++;
 
-      /* Record the correct move */
       saveMovePosition(move);
 
       renderBoard();
@@ -1364,7 +1253,6 @@ function tryMove(from,to){
     }
   }
 
-  /* Legal but wrong move */
   const beforeFen = game.fen();
   const moverColor = game.turn();
 
@@ -1744,7 +1632,6 @@ function playOpponentMove(){
 
   puzzleMoveIndex++;
 
-  /* Record opponent's move */
   saveMovePosition(move);
 
   renderBoard();
@@ -1763,7 +1650,6 @@ async function finishPuzzle(){
   opponentThinking = false;
   wrongMovePending = false;
 
-  /* Update the final history position as solved */
   if(moveHistory.length && historyIndex===moveHistory.length-1){
     moveHistory[historyIndex].solved = true;
   }
@@ -1910,7 +1796,7 @@ function updateInfo(){
   }else if(opponentThinking){
     document.getElementById("gameStatus").textContent = "Opponent Moving";
   }else if(viewingHistory){
-    document.getElementById("gameStatus").textContent = "Viewing History";
+    document.getElementById("gameStatus").textContent = "Move Preview";
   }else{
     document.getElementById("gameStatus").textContent =
       game.in_check() ? "Check" : "In Progress";
