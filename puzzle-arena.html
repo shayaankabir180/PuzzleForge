@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -123,6 +124,11 @@ h1{font-size:26px}
     <button onclick="flipBoard()">⇅ Flip Board</button>
     <button onclick="restartPuzzle()">↻ Restart</button>
     <button onclick="getHint()">💡 Hint</button>
+
+    <!-- NEW: Move navigation -->
+    <button id="previousMoveBtn" onclick="previousMove()" disabled>⏮ Previous Move</button>
+    <button id="nextMoveBtn" onclick="nextMove()" disabled>Next Move ⏭</button>
+
     <button onclick="previousPuzzle()">← Previous Puzzle</button>
     <button class="primary" onclick="nextPuzzle()">Next Puzzle →</button>
   </div>
@@ -208,6 +214,12 @@ let selected = null;
 let legalTargets = [];
 let flipped = false;
 let lastMove = null;
+
+/* NEW: Move history navigation */
+let moveHistory = [];
+let moveHistoryIndex = -1;
+let historyViewer = new Chess();
+let historyViewing = false;
 
 let hintLevel = 0;
 let hintCount = 0;
@@ -430,6 +442,93 @@ function applyUci(uci){
   });
 }
 
+/* ---------------- MOVE HISTORY NAVIGATION ---------------- */
+
+/* Save a position snapshot after a move */
+function recordMoveHistory(){
+  const snapshot = {
+    fen: game.fen(),
+    lastMove: lastMove ? {...lastMove} : null,
+    moveIndex: puzzleMoveIndex
+  };
+
+  /* If a new move is made after viewing an older position,
+     discard the old future history */
+  if(moveHistoryIndex < moveHistory.length-1){
+    moveHistory = moveHistory.slice(0,moveHistoryIndex+1);
+  }
+
+  moveHistory.push(snapshot);
+  moveHistoryIndex = moveHistory.length-1;
+
+  historyViewing = false;
+  updateMoveNavigation();
+}
+
+/* Display a saved position without changing the real puzzle game */
+function showHistoryPosition(index){
+  if(!moveHistory.length) return;
+
+  index = Math.max(0,Math.min(index,moveHistory.length-1));
+  moveHistoryIndex = index;
+
+  const snapshot = moveHistory[index];
+
+  historyViewer.load(snapshot.fen);
+  historyViewing = index !== moveHistory.length-1;
+
+  selected = null;
+  legalTargets = [];
+
+  renderBoard();
+
+  if(historyViewing){
+    setMessage(
+      "Viewing move "+index+" / "+(moveHistory.length-1)+" · Use Next Move to continue."
+    );
+  }else{
+    if(puzzleSolved){
+      setMessage("Puzzle solved! You're viewing the current position.","success");
+    }else if(opponentThinking){
+      setMessage("Opponent is thinking...");
+    }else if(wrongMovePending){
+      setMessage("Wrong move analysis in progress...","wrong");
+    }else{
+      setMessage("Current position · Your turn to continue.");
+    }
+  }
+
+  updateMoveNavigation();
+}
+
+function previousMove(){
+  if(moveHistoryIndex<=0) return;
+  if(opponentThinking || wrongMovePending) return;
+
+  showHistoryPosition(moveHistoryIndex-1);
+}
+
+function nextMove(){
+  if(moveHistoryIndex>=moveHistory.length-1) return;
+  if(opponentThinking || wrongMovePending) return;
+
+  showHistoryPosition(moveHistoryIndex+1);
+}
+
+function updateMoveNavigation(){
+  const previousBtn = document.getElementById("previousMoveBtn");
+  const nextBtn = document.getElementById("nextMoveBtn");
+
+  if(!previousBtn || !nextBtn) return;
+
+  previousBtn.disabled =
+    moveHistoryIndex<=0 || opponentThinking || wrongMovePending;
+
+  nextBtn.disabled =
+    moveHistoryIndex>=moveHistory.length-1 ||
+    opponentThinking || wrongMovePending;
+}
+
 /* ---------------- STOCKFISH ---------------- */
 
 function startStockfish(){
@@ -633,6 +732,7 @@ function restoreAfterWrongMove(){
 
   renderBoard();
   wrongMoveTimer = null;
+  updateMoveNavigation();
 }
 
 async function explainWrongMove(beforeFen,afterFen,moverColor){
@@ -715,6 +815,11 @@ function applyRatingFilter(){
     selected = null;
     legalTargets = [];
     hintSquare = null;
+
+    moveHistory = [];
+    moveHistoryIndex = -1;
+    historyViewing = false;
+    updateMoveNavigation();
 
     if(wrongMoveTimer){
       clearTimeout(wrongMoveTimer);
@@ -859,6 +964,11 @@ function startPuzzle(index){
   legalTargets = [];
   lastMove = null;
 
+  /* NEW: reset move history for each puzzle */
+  moveHistory = [];
+  moveHistoryIndex = -1;
+  historyViewing = false;
+
   hintLevel = 0;
   hintCount = 0;
   hintSquare = null;
@@ -870,6 +980,10 @@ function startPuzzle(index){
 
   try{
     game.load(currentPuzzle.fen);
+
+    /* NEW: save the original position before setup move */
+    lastMove = null;
+    recordMoveHistory();
 
     const moves = currentPuzzle.moves;
 
@@ -891,6 +1005,9 @@ function startPuzzle(index){
     puzzleMoveIndex = 1;
     flipped = game.turn()==="b";
 
+    /* NEW: save position after the setup move */
+    recordMoveHistory();
+
     document.getElementById("puzzleNumber").textContent =
       "Puzzle "+(activeIndex+1)+" / "+activePuzzles.length;
 
@@ -908,6 +1025,7 @@ function startPuzzle(index){
 
     renderBoard();
     saveProgress();
+    updateMoveNavigation();
   }catch(error){
     setMessage("Puzzle error: "+error.message,"wrong");
     document.getElementById("gameStatus").textContent = "Puzzle Error";
@@ -917,7 +1035,13 @@ function startPuzzle(index){
 function renderBoard(){
   boardElement.innerHTML = "";
 
-  const position = game.board();
+  /* NEW: render saved position when browsing move history */
+  const displayGame = historyViewing ? historyViewer : game;
+  const position = displayGame.board();
+
+  const displayLastMove = historyViewing
+    ? (moveHistory[moveHistoryIndex]?.lastMove || null)
+    : lastMove;
 
   for(let r=0;r<8;r++){
     for(let c=0;c<8;c++){
@@ -936,18 +1060,20 @@ function renderBoard(){
 
       square.dataset.square = squareName;
 
-      if(selected===squareName) square.classList.add("selected");
+      if(!historyViewing && selected===squareName)
+        square.classList.add("selected");
 
-      if(lastMove && (
-        lastMove.from===squareName ||
-        lastMove.to===squareName
+      if(displayLastMove && (
+        displayLastMove.from===squareName ||
+        displayLastMove.to===squareName
       )){
         square.classList.add("last-move");
       }
 
-      if(hintSquare===squareName) square.classList.add("hint");
+      if(!historyViewing && hintSquare===squareName)
+        square.classList.add("hint");
 
-      if(legalTargets.includes(squareName)){
+      if(!historyViewing && legalTargets.includes(squareName)){
         square.classList.add(piece ? "capture" : "possible");
       }
 
@@ -992,12 +1118,14 @@ function renderBoard(){
   }
 
   updateInfo();
+  updateMoveNavigation();
 }
 
 /* ---------------- MOVE HANDLING ---------------- */
 
 function canInteract(){
-  return !(puzzleSolved || opponentThinking || wrongMovePending || !currentPuzzle);
+  return !(puzzleSolved || opponentThinking || wrongMovePending ||
+           historyViewing || !currentPuzzle);
 }
 
 function tryMove(from,to){
@@ -1031,12 +1159,16 @@ function tryMove(from,to){
 
       puzzleMoveIndex++;
 
+      /* NEW: save the player's move */
+      recordMoveHistory();
+
       renderBoard();
 
       if(puzzleMoveIndex>=currentPuzzle.moves.length){
         finishPuzzle();
       }else{
         opponentThinking = true;
+        updateMoveNavigation();
         setMessage("Correct move! Opponent is thinking...");
         setTimeout(playOpponentMove,600);
       }
@@ -1074,6 +1206,7 @@ function tryMove(from,to){
     hintSquare = null;
     wrongMovePending = true;
 
+    updateMoveNavigation();
     renderBoard();
     explainWrongMove(beforeFen,afterFen,moverColor);
 
@@ -1318,7 +1451,7 @@ boardElement.addEventListener("pointermove",event=>{
     ghost.style.height = size+"px";
     document.body.appendChild(ghost);
 
-    /* FIX: fade the original piece in its original square */
+    /* Fade original piece in its original square */
     originImg.classList.add("drag-origin");
     originImg.style.opacity = "0.25";
 
@@ -1418,6 +1551,7 @@ function playOpponentMove(){
 
   if(!move){
     setMessage("Puzzle move error. Please restart.","wrong");
+    updateMoveNavigation();
     return;
   }
 
@@ -1427,6 +1561,9 @@ function playOpponentMove(){
   };
 
   puzzleMoveIndex++;
+
+  /* NEW: save opponent's move position */
+  recordMoveHistory();
 
   renderBoard();
 
@@ -1443,6 +1580,7 @@ async function finishPuzzle(){
   puzzleSolved = true;
   opponentThinking = false;
   wrongMovePending = false;
+  updateMoveNavigation();
 
   const id = String(currentPuzzle.id);
 
@@ -1576,10 +1714,15 @@ function flipBoard(){
 }
 
 function updateInfo(){
-  document.getElementById("turn").textContent =
-    game.turn()==="w" ? "White" : "Black";
+  const displayGame = historyViewing ? historyViewer : game;
 
-  if(puzzleSolved){
+  document.getElementById("turn").textContent =
+    displayGame.turn()==="w" ? "White" : "Black";
+
+  if(historyViewing){
+    document.getElementById("gameStatus").textContent =
+      "Viewing Move "+moveHistoryIndex+" / "+(moveHistory.length-1);
+  }else if(puzzleSolved){
     document.getElementById("gameStatus").textContent = "Puzzle Solved!";
   }else if(opponentThinking){
     document.getElementById("gameStatus").textContent = "Opponent Moving";
