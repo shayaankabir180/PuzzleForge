@@ -297,7 +297,7 @@ async function loadCloudSolvedPuzzles(user){
 
     cloudSolvedIds = new Set(ids.map(String));
   }catch(error){
-    console.error("Could not load account solved puzzles:", error);
+    console.error("Could not load account solved puzzles:",error);
     setMessage(
       "Could not load your saved solved-puzzle list. Please refresh or try again.",
       "wrong"
@@ -1365,7 +1365,7 @@ boardElement.addEventListener("pointerup",event=>{
     if(state.movable && target && target!==state.from && legalTargets.includes(target)){
       state.ghost.remove();
 
-      if(!tryMove(state.from,target){
+      if(!tryMove(state.from,target)){
         state.originImg.classList.remove("drag-origin");
         state.originImg.style.opacity = "";
         renderBoard();
@@ -1456,7 +1456,7 @@ async function finishPuzzle(){
 
   const today = localDateKey();
 
-  if(!solvedDates.includes(today){
+  if(!solvedDates.includes(today)){
     solvedDates.push(today);
   }
 
