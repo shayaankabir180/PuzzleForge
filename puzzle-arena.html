@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -40,13 +41,7 @@ h1{font-size:30px;margin-bottom:8px}
 .square.hint{background:#e6bd42}
 .square.drag-over{box-shadow:inset 0 0 0 4px rgba(255,255,255,.75)}
 .piece-image{width:92%;height:92%;object-fit:contain;display:block;pointer-events:none;user-select:none;position:relative;z-index:2;filter:drop-shadow(0 1px 1px rgba(0,0,0,.22))}
-
-/* FIX: original piece becomes translucent while dragging */
-.piece-image.drag-origin{
-  opacity:.25 !important;
-  transition:opacity .08s ease;
-}
-
+.piece-image.drag-origin{opacity:.25 !important;transition:opacity .08s ease}
 .drag-ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:9999;object-fit:contain;will-change:transform;filter:drop-shadow(0 8px 10px rgba(0,0,0,.45))}
 .drag-ghost.snap{transition:transform .18s cubic-bezier(.2,.8,.2,1)}
 .square:has(.piece-image){cursor:grab}
@@ -68,10 +63,80 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .themes{color:#aab4c3;font-size:12px;line-height:1.6;margin-top:12px}
 .note{color:#929baa;font-size:12px;line-height:1.5;margin-top:18px}
 
+/* MOVE NAVIGATION */
+.move-navigation{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin-top:14px;
+  padding:10px;
+  background:#222936;
+  border-radius:9px;
+}
+.move-navigation button{
+  min-width:42px;
+  padding:10px 12px;
+  font-size:17px;
+}
+.move-counter{
+  color:#d7bd70;
+  font-size:13px;
+  font-weight:bold;
+  min-width:65px;
+  text-align:center;
+}
+.move-history{
+  margin-top:12px;
+  padding:12px;
+  background:#222936;
+  border-radius:9px;
+}
+.move-history h4{
+  color:#d7bd70;
+  margin-bottom:10px;
+  font-size:14px;
+}
+.move-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  max-height:150px;
+  overflow-y:auto;
+}
+.move-item{
+  padding:7px 10px;
+  border-radius:6px;
+  background:#303a4b;
+  color:#dce2eb;
+  font-size:13px;
+  cursor:pointer;
+  border:1px solid transparent;
+}
+.move-item:hover{background:#46546b}
+.move-item.active{
+  background:#b6a05a;
+  color:#111;
+  font-weight:bold;
+}
+.move-empty{
+  color:#929baa;
+  font-size:12px;
+}
+.history-info{
+  color:#929baa;
+  font-size:11px;
+  margin-top:9px;
+  line-height:1.5;
+}
+
 @media(max-width:720px){
 .layout{grid-template-columns:1fr}
 body{padding:12px}
 h1{font-size:26px}
+.move-navigation{gap:5px;padding:8px}
+.move-navigation button{min-width:36px;padding:9px 8px}
+.move-counter{min-width:55px;font-size:12px}
 }
 </style>
 </head>
@@ -125,6 +190,25 @@ h1{font-size:26px}
     <button onclick="getHint()">💡 Hint</button>
     <button onclick="previousPuzzle()">← Previous Puzzle</button>
     <button class="primary" onclick="nextPuzzle()">Next Puzzle →</button>
+  </div>
+
+  <!-- MOVE NAVIGATION -->
+  <div class="move-navigation">
+    <button id="firstMoveBtn" onclick="goToFirstMove()" title="First Move">|◀</button>
+    <button id="previousMoveBtn" onclick="goToPreviousMove()" title="Previous Move">◀</button>
+    <span class="move-counter" id="moveCounter">0 / 0</span>
+    <button id="nextMoveBtn" onclick="goToNextMove()" title="Next Move">▶</button>
+    <button id="lastMoveBtn" onclick="goToLastMove()" title="Last Move">▶|</button>
+  </div>
+
+  <div class="move-history">
+    <h4>Move History</h4>
+    <div class="move-list" id="moveHistory">
+      <span class="move-empty">No moves yet</span>
+    </div>
+    <p class="history-info">
+      Select any move to view that position on the board.
+    </p>
   </div>
 
   <p id="status" class="status">Loading puzzle database...</p>
@@ -228,6 +312,13 @@ let dailySolved = {};
 
 let wrongMoveTimer = null;
 let wrongMovePreviousLastMove = null;
+
+/* ---------------- MOVE NAVIGATION VARIABLES ---------------- */
+
+let moveHistory = [];
+let historyIndex = 0;
+let viewingHistory = false;
+let opponentMoveTimer = null;
 
 /* ---------------- CLOUD / ACCOUNT ---------------- */
 
@@ -721,6 +812,16 @@ function applyRatingFilter(){
       wrongMoveTimer = null;
     }
 
+    if(opponentMoveTimer){
+      clearTimeout(opponentMoveTimer);
+      opponentMoveTimer = null;
+    }
+
+    moveHistory = [];
+    historyIndex = 0;
+    viewingHistory = false;
+    updateMoveNavigation();
+
     document.getElementById("puzzleNumber").textContent =
       "No puzzles in this rating range";
 
@@ -845,6 +946,11 @@ function startPuzzle(index){
     wrongMoveTimer = null;
   }
 
+  if(opponentMoveTimer){
+    clearTimeout(opponentMoveTimer);
+    opponentMoveTimer = null;
+  }
+
   const activeIndex = (index+activePuzzles.length)%activePuzzles.length;
   currentPuzzle = activePuzzles[activeIndex];
 
@@ -867,6 +973,11 @@ function startPuzzle(index){
   puzzleSolved = false;
   wrongMovePending = false;
   wrongMoveNoticeActive = false;
+
+  /* Reset move navigation */
+  moveHistory = [];
+  historyIndex = 0;
+  viewingHistory = false;
 
   try{
     game.load(currentPuzzle.fen);
@@ -906,13 +1017,200 @@ function startPuzzle(index){
 
     setMessage("Find the best move!");
 
+    /* Save initial puzzle position after setup move */
+    saveMovePosition(null);
+
     renderBoard();
     saveProgress();
+
   }catch(error){
     setMessage("Puzzle error: "+error.message,"wrong");
     document.getElementById("gameStatus").textContent = "Puzzle Error";
   }
 }
+
+/* ---------------- MOVE HISTORY SYSTEM ---------------- */
+
+function saveMovePosition(move){
+
+  /* Remove future positions if a new branch is created */
+  moveHistory = moveHistory.slice(0,historyIndex+1);
+
+  moveHistory.push({
+    fen:game.fen(),
+
+    lastMove:lastMove ? {...lastMove} : null,
+
+    puzzleMoveIndex:puzzleMoveIndex,
+
+    san:move ? move.san : null,
+
+    color:move ? move.color : null,
+
+    solved:puzzleSolved
+  });
+
+  historyIndex = moveHistory.length-1;
+
+  viewingHistory = false;
+
+  updateMoveNavigation();
+}
+
+function updateMoveNavigation(){
+
+  const counter = document.getElementById("moveCounter");
+
+  const previous = document.getElementById("previousMoveBtn");
+  const next = document.getElementById("nextMoveBtn");
+
+  const first = document.getElementById("firstMoveBtn");
+  const last = document.getElementById("lastMoveBtn");
+
+  if(!counter) return;
+
+  counter.textContent =
+    historyIndex+" / "+Math.max(0,moveHistory.length-1);
+
+  const navigationLocked = opponentThinking || wrongMovePending;
+
+  previous.disabled = historyIndex<=0 || navigationLocked;
+  first.disabled = historyIndex<=0 || navigationLocked;
+
+  next.disabled = historyIndex>=moveHistory.length-1 || navigationLocked;
+  last.disabled = historyIndex>=moveHistory.length-1 || navigationLocked;
+
+  const historyElement = document.getElementById("moveHistory");
+
+  if(!historyElement) return;
+
+  historyElement.innerHTML = "";
+
+  if(moveHistory.length<=1){
+    const empty = document.createElement("span");
+    empty.className = "move-empty";
+    empty.textContent = "No moves yet";
+    historyElement.appendChild(empty);
+    return;
+  }
+
+  moveHistory.forEach((position,index)=>{
+
+    if(index===0) return;
+
+    const item = document.createElement("button");
+
+    item.className = "move-item";
+
+    const moveNumber = Math.floor((index-1)/2)+1;
+
+    item.textContent =
+      (position.color==="w" ? moveNumber+". " :
+       (index===1 ? moveNumber+"... " : ""))+
+      (position.san || "?");
+
+    if(index===historyIndex){
+      item.classList.add("active");
+    }
+
+    item.disabled = navigationLocked;
+
+    item.onclick = ()=>{
+      goToMove(index);
+    };
+
+    historyElement.appendChild(item);
+
+  });
+
+}
+
+function goToMove(index){
+
+  if(index<0 || index>=moveHistory.length) return;
+
+  if(opponentThinking || wrongMovePending) return;
+
+  const position = moveHistory[index];
+
+  cancelDrag();
+
+  if(wrongMoveTimer){
+    clearTimeout(wrongMoveTimer);
+    wrongMoveTimer=null;
+  }
+
+  if(opponentMoveTimer){
+    clearTimeout(opponentMoveTimer);
+    opponentMoveTimer=null;
+  }
+
+  const loaded = game.load(position.fen);
+
+  if(!loaded) return;
+
+  historyIndex=index;
+
+  puzzleMoveIndex=position.puzzleMoveIndex;
+
+  lastMove=position.lastMove
+    ? {...position.lastMove}
+    : null;
+
+  puzzleSolved=position.solved;
+
+  opponentThinking=false;
+  wrongMovePending=false;
+  wrongMoveNoticeActive=false;
+
+  selected=null;
+  legalTargets=[];
+  hintSquare=null;
+
+  viewingHistory = historyIndex!==moveHistory.length-1;
+
+  renderBoard();
+
+  if(viewingHistory){
+
+    setMessage(
+      "Viewing previous position. Return to the latest move to continue."
+    );
+
+  }else if(puzzleSolved){
+
+    setMessage("Puzzle solved!","success");
+
+  }else{
+
+    setMessage("Your turn. Find the next correct move!");
+
+  }
+
+  updateMoveNavigation();
+}
+
+function goToPreviousMove(){
+  if(historyIndex>0){
+    goToMove(historyIndex-1);
+  }
+}
+
+function goToNextMove(){
+  if(historyIndex<moveHistory.length-1){
+    goToMove(historyIndex+1);
+  }
+}
+
+function goToFirstMove(){
+  goToMove(0);
+}
+
+function goToLastMove(){
+  goToMove(moveHistory.length-1);
+}
+
+/* ---------------- BOARD RENDERING ---------------- */
 
 function renderBoard(){
   boardElement.innerHTML = "";
@@ -997,10 +1295,23 @@ function renderBoard(){
 /* ---------------- MOVE HANDLING ---------------- */
 
 function canInteract(){
-  return !(puzzleSolved || opponentThinking || wrongMovePending || !currentPuzzle);
+  return !(
+    puzzleSolved ||
+    opponentThinking ||
+    wrongMovePending ||
+    viewingHistory ||
+    !currentPuzzle
+  );
 }
 
 function tryMove(from,to){
+
+  /* Do not allow playing from an old history position */
+  if(viewingHistory){
+    setMessage("Return to the latest move before playing.");
+    return false;
+  }
+
   if(from===to) return false;
 
   const expected = currentPuzzle.moves[puzzleMoveIndex];
@@ -1031,14 +1342,22 @@ function tryMove(from,to){
 
       puzzleMoveIndex++;
 
+      /* Record the correct move */
+      saveMovePosition(move);
+
       renderBoard();
 
       if(puzzleMoveIndex>=currentPuzzle.moves.length){
         finishPuzzle();
       }else{
         opponentThinking = true;
+        updateMoveNavigation();
         setMessage("Correct move! Opponent is thinking...");
-        setTimeout(playOpponentMove,600);
+
+        opponentMoveTimer = setTimeout(()=>{
+          opponentMoveTimer=null;
+          playOpponentMove();
+        },600);
       }
 
       return true;
@@ -1074,7 +1393,9 @@ function tryMove(from,to){
     hintSquare = null;
     wrongMovePending = true;
 
+    updateMoveNavigation();
     renderBoard();
+
     explainWrongMove(beforeFen,afterFen,moverColor);
 
     return true;
@@ -1199,7 +1520,6 @@ function endDragTracking(){
   return state;
 }
 
-/* Immediate cleanup */
 function cancelDrag(){
   const state = endDragTracking();
   if(!state) return;
@@ -1212,7 +1532,6 @@ function cancelDrag(){
   }
 }
 
-/* Smoothly glide the ghost back to its original square */
 function snapBack(state){
   const ghost = state.ghost;
   if(!ghost) return;
@@ -1318,7 +1637,6 @@ boardElement.addEventListener("pointermove",event=>{
     ghost.style.height = size+"px";
     document.body.appendChild(ghost);
 
-    /* FIX: fade the original piece in its original square */
     originImg.classList.add("drag-origin");
     originImg.style.opacity = "0.25";
 
@@ -1361,7 +1679,6 @@ boardElement.addEventListener("pointerup",event=>{
   const target = idx>=0 ? squareNameFromIndex(idx) : null;
 
   if(state.dragging){
-    /* Legal drop */
     if(state.movable && target && target!==state.from && legalTargets.includes(target)){
       state.ghost.remove();
 
@@ -1374,7 +1691,6 @@ boardElement.addEventListener("pointerup",event=>{
       return;
     }
 
-    /* Invalid drop: glide back */
     snapBack(state);
 
     if(target && target!==state.from){
@@ -1388,7 +1704,6 @@ boardElement.addEventListener("pointerup",event=>{
     return;
   }
 
-  /* Plain click */
   if(target){
     if(state.movable && target===state.from) return;
     handleClick(target);
@@ -1417,6 +1732,7 @@ function playOpponentMove(){
   opponentThinking = false;
 
   if(!move){
+    updateMoveNavigation();
     setMessage("Puzzle move error. Please restart.","wrong");
     return;
   }
@@ -1427,6 +1743,9 @@ function playOpponentMove(){
   };
 
   puzzleMoveIndex++;
+
+  /* Record opponent's move */
+  saveMovePosition(move);
 
   renderBoard();
 
@@ -1443,6 +1762,13 @@ async function finishPuzzle(){
   puzzleSolved = true;
   opponentThinking = false;
   wrongMovePending = false;
+
+  /* Update the final history position as solved */
+  if(moveHistory.length && historyIndex===moveHistory.length-1){
+    moveHistory[historyIndex].solved = true;
+  }
+
+  updateMoveNavigation();
 
   const id = String(currentPuzzle.id);
 
@@ -1583,6 +1909,8 @@ function updateInfo(){
     document.getElementById("gameStatus").textContent = "Puzzle Solved!";
   }else if(opponentThinking){
     document.getElementById("gameStatus").textContent = "Opponent Moving";
+  }else if(viewingHistory){
+    document.getElementById("gameStatus").textContent = "Viewing History";
   }else{
     document.getElementById("gameStatus").textContent =
       game.in_check() ? "Check" : "In Progress";
