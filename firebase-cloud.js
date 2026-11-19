@@ -2,6 +2,7 @@
 /* PuzzleForge — Firebase shared cloud layer
    Google Authentication + account-isolated Cloud Firestore data.
    Woodpecker statistics are synchronized per Google account.
+   Community Puzzle Library: Public uploads + creator information.
 */
 (function () {
   "use strict";
@@ -490,14 +491,12 @@
     let local;
 
     if (owner === uid) {
-      // Local data belongs to the currently signed-in account.
       local = readLocal(
         WOODPECKER_KEY,
         accountCache
       );
 
     } else if (!owner) {
-      // First account sign-in: guest data may be imported.
       const guestData = readLocal(
         WOODPECKER_KEY,
         emptyWoodpecker()
@@ -509,8 +508,6 @@
       );
 
     } else {
-      // Another Gmail previously used this browser.
-      // Never import that account's global cache.
       local = accountCache;
     }
 
@@ -523,13 +520,11 @@
       cloud
     );
 
-    // Maintain a separate local backup for each Gmail.
     writeLocal(
       accountWoodpeckerKey(uid),
       merged
     );
 
-    // Keep compatibility with the existing Woodpecker HTML.
     writeLocal(
       WOODPECKER_KEY,
       merged
@@ -754,20 +749,71 @@
 
   /* ---------------- COMMUNITY PUZZLES ---------------- */
 
+  // Get every publicly uploaded puzzle.
   async function getPublicPuzzles() {
+    await authReady;
+
     const snapshot = await db
       .collection("puzzles")
       .orderBy("createdAt", "desc")
       .get();
 
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    return snapshot.docs.map(doc => {
+      const data = doc.data() || {};
+
+      return {
+        ...data,
+        id: doc.id
+      };
+    });
   }
 
+  // Get one specific community puzzle using its ID.
+  // This is used when someone clicks a puzzle in the Library.
+  async function getPublicPuzzle(puzzleId) {
+    await authReady;
+
+    const id = String(puzzleId || "").trim();
+
+    if (!id) {
+      throw new Error("Puzzle ID is required.");
+    }
+
+    const doc = await db
+      .collection("puzzles")
+      .doc(id)
+      .get();
+
+    if (!doc.exists) {
+      throw new Error(
+        "This community puzzle does not exist or has been deleted."
+      );
+    }
+
+    return {
+      ...doc.data(),
+      id: doc.id
+    };
+  }
+
+  // Prepare and validate puzzle information before uploading.
   function cleanPuzzle(input) {
+    input = input && typeof input === "object"
+      ? input
+      : {};
+
     const puzzle = {
+      title: String(
+        input.title ||
+        input.name ||
+        input.puzzleName ||
+        "Untitled Puzzle"
+      ).trim().slice(0, 120),
+
+      description: String(
+        input.description || ""
+      ).trim().slice(0, 1000),
+
       fen: String(input.fen || "").trim(),
 
       moves: Array.isArray(input.moves)
@@ -782,7 +828,7 @@
       rating: Number(input.rating) || 0,
 
       themes: Array.isArray(input.themes)
-        ? input.themes
+        ? input.themes.map(String)
         : String(input.themes || "")
             .split(",")
             .map(x => x.trim())
@@ -806,6 +852,7 @@
     return puzzle;
   }
 
+  // Upload a puzzle to the global public library.
   async function uploadPuzzle(input) {
     await authReady;
 
@@ -821,24 +868,36 @@
       .collection("puzzles")
       .doc();
 
+    const creatorName =
+      currentUser.displayName ||
+      currentUser.email ||
+      "PuzzleForge Member";
+
+    const createdAt =
+      firebase.firestore.FieldValue.serverTimestamp();
+
     await doc.set({
       ...puzzle,
 
+      // Unique Google account ID of the creator.
       ownerId: currentUser.uid,
 
-      ownerName:
-        currentUser.displayName || "",
+      // Public creator information.
+      ownerName: creatorName,
 
-      createdAt:
-        firebase.firestore.FieldValue.serverTimestamp()
+      // Server-generated upload date.
+      createdAt: createdAt
     });
 
     return {
       id: doc.id,
-      ...puzzle
+      ...puzzle,
+      ownerId: currentUser.uid,
+      ownerName: creatorName
     };
   }
 
+  // Only the original uploader can delete their puzzle.
   async function deletePuzzle(puzzleId) {
     await authReady;
 
@@ -938,8 +997,6 @@
     const oldUid = previousUid;
     const newUid = user ? user.uid : null;
 
-    // Preserve the previous account's local backup
-    // before another account becomes active.
     if (oldUid && oldUid !== newUid) {
       writeLocal(
         accountWoodpeckerKey(oldUid),
@@ -1013,7 +1070,9 @@
     getProgress,
     saveProgress,
 
+    // Community Puzzle Library API.
     getPublicPuzzles,
+    getPublicPuzzle,
     uploadPuzzle,
     deletePuzzle,
 
