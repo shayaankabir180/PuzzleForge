@@ -98,7 +98,12 @@ textarea{min-height:85px;resize:vertical}
   background:#10141d;
   border:1px solid var(--line);
   border-radius:10px;
-  padding:15px
+  padding:15px;
+  transition:border-color .2s,background .2s
+}
+.puzzle:hover{
+  border-color:var(--gold);
+  background:#151a24
 }
 .puzzle strong{font-size:14px}
 .puzzle small{
@@ -106,6 +111,33 @@ textarea{min-height:85px;resize:vertical}
   color:var(--muted);
   margin-top:5px;
   overflow-wrap:anywhere
+}
+.puzzle-title{
+  font-size:16px;
+  font-weight:750;
+  color:#f4f5f7;
+  margin-bottom:5px
+}
+.creator{
+  color:var(--gold)!important;
+  font-size:12px;
+  margin-top:7px
+}
+.puzzle-description{
+  color:#c0c5d0;
+  font-size:13px;
+  margin-top:8px;
+  overflow-wrap:anywhere
+}
+.open-puzzle{
+  display:inline-block;
+  margin-top:12px;
+  padding:8px 13px;
+  background:var(--gold);
+  color:#111;
+  border-radius:7px;
+  font-size:12px;
+  font-weight:750;
 }
 .delete{
   margin-top:10px;
@@ -130,6 +162,12 @@ textarea{min-height:85px;resize:vertical}
   display:block;
   color:#cbb36a;
   margin-top:5px;
+  overflow-wrap:anywhere
+}
+.puzzle-id{
+  font-size:11px;
+  color:#737d90;
+  margin-top:8px;
   overflow-wrap:anywhere
 }
 @media(max-width:600px){
@@ -160,7 +198,10 @@ textarea{min-height:85px;resize:vertical}
 
 <section class="card">
   <h2>Community Puzzles</h2>
-  <p class="muted">Browse puzzles shared by PuzzleForge users.</p>
+  <p class="muted">
+    Browse puzzles shared by PuzzleForge users around the world.
+  </p>
+
   <div class="list" id="puzzleList">
     <p class="muted">Loading public puzzles…</p>
   </div>
@@ -170,10 +211,24 @@ textarea{min-height:85px;resize:vertical}
 
   <h2>Upload a Puzzle</h2>
   <p class="muted">
-    Uploaded puzzles are public and may be added to the training decks.
+    Share your chess puzzles with the entire PuzzleForge community.
   </p>
 
   <div id="uploadForm">
+
+    <label for="title">Puzzle Title</label>
+    <input
+      id="title"
+      maxlength="120"
+      placeholder="Example: Beautiful Queen Sacrifice"
+    >
+
+    <label for="description">Puzzle Description</label>
+    <textarea
+      id="description"
+      maxlength="1000"
+      placeholder="Describe your puzzle (optional)"
+    ></textarea>
 
     <label for="fen">Puzzle FEN</label>
     <textarea
@@ -241,7 +296,6 @@ textarea{min-height:85px;resize:vertical}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
-<!-- Chess.js is used to validate SAN moves and convert them internally. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
 <script src="firebase-cloud.js"></script>
@@ -269,19 +323,12 @@ function renderAuth(){
   $("uploadBtn").disabled=!user;
 
   $("loginNote").textContent=user
-    ?"Your puzzle will be public and available to other users."
+    ?"Your puzzle will be public and available to everyone."
     :"Sign in with Google from the Home Page to upload puzzles.";
 }
 
 /*
   Convert standard SAN notation into UCI internally.
-
-  Example:
-  SAN: 1. e4 e5 2. Nf3 Nc6
-  UCI: e2e4 e7e5 g1f3 b8c6
-
-  This preserves compatibility with the existing
-  PuzzleForge puzzle system.
 */
 
 function convertSANtoUCI(fen,sanText){
@@ -304,22 +351,11 @@ function convertSANtoUCI(fen,sanText){
 
   let text=sanText;
 
-  // Remove PGN comments.
   text=text.replace(/\{[^}]*\}/g," ");
-
-  // Remove semicolon comments.
   text=text.replace(/;[^\r\n]*/g," ");
-
-  // Remove simple PGN variations.
   text=text.replace(/\([^)]*\)/g," ");
-
-  // Remove annotation glyphs.
   text=text.replace(/\$\d+/g," ");
-
-  // Remove game result markers.
   text=text.replace(/\b(?:1-0|0-1|1\/2-1\/2|\*)\b/g," ");
-
-  // Remove standalone en-passant notation.
   text=text.replace(/\be\.p\./gi," ");
 
   const tokens=text.trim().split(/\s+/).filter(Boolean);
@@ -328,27 +364,22 @@ function convertSANtoUCI(fen,sanText){
 
   for(let token of tokens){
 
-    // Ignore standalone move numbers: 1. or 1...
     if(/^\d+\.(?:\.\.)?$/.test(token)){
       continue;
     }
 
-    // Remove move number prefixes: 1.e4 or 1...e5
     token=token.replace(/^\d+\.(?:\.\.)?/,"");
 
     if(!token){
       continue;
     }
 
-    // Ignore ellipsis tokens.
     if(/^\.+$/.test(token)){
       continue;
     }
 
-    // Remove trailing annotation marks.
     token=token.replace(/[!?]+$/,"");
 
-    // Normalize zero-based castling notation.
     token=token.replace(/^0-0-0/i,"O-O-O");
     token=token.replace(/^0-0/i,"O-O");
 
@@ -370,7 +401,6 @@ function convertSANtoUCI(fen,sanText){
       );
     }
 
-    // Convert the validated move to UCI.
     let uci=move.from+move.to;
 
     if(move.promotion){
@@ -386,6 +416,47 @@ function convertSANtoUCI(fen,sanText){
 
   return uciMoves;
 }
+
+/* ---------------- DATE FORMAT ---------------- */
+
+function formatDate(timestamp){
+
+  if(!timestamp)return "Date unavailable";
+
+  let date;
+
+  if(timestamp.toDate){
+    date=timestamp.toDate();
+  }else{
+    date=new Date(timestamp);
+  }
+
+  if(isNaN(date.getTime())){
+    return "Date unavailable";
+  }
+
+  return date.toLocaleString(undefined,{
+    year:"numeric",
+    month:"short",
+    day:"numeric",
+    hour:"2-digit",
+    minute:"2-digit"
+  });
+}
+
+/* ---------------- OPEN PUZZLE ---------------- */
+
+function openPuzzle(puzzleId){
+
+  if(!puzzleId)return;
+
+  const url=
+    "puzzle-arena.html?id="+encodeURIComponent(puzzleId);
+
+  window.location.href=url;
+}
+
+/* ---------------- RENDER LIBRARY ---------------- */
 
 function renderPuzzles(){
 
@@ -407,9 +478,27 @@ function renderPuzzles(){
     const item=document.createElement("div");
     item.className="puzzle";
 
-    const title=document.createElement("strong");
-    title.textContent="Puzzle · Rating "+(p.rating||"Unrated");
+    // Puzzle title.
+    const title=document.createElement("div");
+    title.className="puzzle-title";
+    title.textContent=p.title||"Untitled Puzzle";
 
+    // Creator information.
+    const creator=document.createElement("small");
+    creator.className="creator";
+
+    creator.textContent=
+      "Uploaded by: "+(
+        p.ownerName||"PuzzleForge Member"
+      );
+
+    // Upload date.
+    const date=document.createElement("small");
+
+    date.textContent=
+      "Uploaded: "+formatDate(p.createdAt);
+
+    // Rating and themes.
     const detail=document.createElement("small");
 
     const themes=Array.isArray(p.themes)
@@ -417,11 +506,45 @@ function renderPuzzles(){
       :"";
 
     detail.textContent=
-      (themes?"Themes: "+themes+" · ":"")+
-      "Puzzle ID: "+(p.id||"");
+      "Rating: "+(p.rating||"Unrated")+
+      (themes?" · Themes: "+themes:"");
 
-    item.append(title,detail);
+    // Description.
+    item.append(
+      title,
+      creator,
+      date,
+      detail
+    );
 
+    if(p.description){
+
+      const description=document.createElement("div");
+      description.className="puzzle-description";
+      description.textContent=p.description;
+
+      item.appendChild(description);
+    }
+
+    // Puzzle ID.
+    const id=document.createElement("div");
+    id.className="puzzle-id";
+    id.textContent="Puzzle ID: "+p.id;
+
+    item.appendChild(id);
+
+    // Open button.
+    const open=document.createElement("a");
+
+    open.className="open-puzzle";
+    open.href=
+      "puzzle-arena.html?id="+encodeURIComponent(p.id);
+
+    open.textContent="Open Puzzle →";
+
+    item.appendChild(open);
+
+    // Original game URL.
     if(p.gameUrl){
 
       const link=document.createElement("a");
@@ -432,6 +555,7 @@ function renderPuzzles(){
       link.textContent="View original game";
 
       link.style.display="inline-block";
+      link.style.marginLeft="12px";
       link.style.marginTop="9px";
       link.style.fontSize="12px";
       link.style.color="#cbb36a";
@@ -439,6 +563,7 @@ function renderPuzzles(){
       item.appendChild(link);
     }
 
+    // Delete button for the original uploader.
     if(user&&p.ownerId===user.uid){
 
       const del=document.createElement("button");
@@ -448,19 +573,23 @@ function renderPuzzles(){
 
       del.addEventListener("click",async()=>{
 
-        if(!confirm("Delete this puzzle?"))return;
+        if(!confirm("Delete this puzzle permanently?"))return;
 
         try{
+
+          del.disabled=true;
 
           await window.PF.deletePuzzle(p.id);
 
           await loadPuzzles();
 
-          message("Puzzle deleted.");
+          message("Puzzle deleted successfully.");
 
         }catch(e){
 
           message(e.message||"Could not delete puzzle.",true);
+
+          del.disabled=false;
         }
       });
 
@@ -471,11 +600,15 @@ function renderPuzzles(){
   });
 }
 
+/* ---------------- LOAD PUBLIC PUZZLES ---------------- */
+
 async function loadPuzzles(){
 
   if(!window.PF?.getPublicPuzzles){
 
-    $("puzzleList").textContent="Firebase library is unavailable.";
+    $("puzzleList").textContent=
+      "Firebase library is unavailable.";
+
     return;
   }
 
@@ -493,9 +626,12 @@ async function loadPuzzles(){
 
     console.error(e);
 
-    $("puzzleList").textContent="Could not load public puzzles.";
+    $("puzzleList").textContent=
+      "Could not load public puzzles. Please refresh.";
   }
 }
+
+/* ---------------- UPLOAD PUZZLE ---------------- */
 
 $("uploadBtn").addEventListener("click",async()=>{
 
@@ -505,7 +641,12 @@ $("uploadBtn").addEventListener("click",async()=>{
     return;
   }
 
+  const title=$("title").value.trim();
+
+  const description=$("description").value.trim();
+
   const fen=$("fen").value.trim();
+
   const sanText=$("moves").value.trim();
 
   const rating=Number($("rating").value);
@@ -516,6 +657,12 @@ $("uploadBtn").addEventListener("click",async()=>{
     .filter(Boolean);
 
   const gameUrl=$("gameUrl").value.trim();
+
+  if(!title){
+
+    message("Please enter a puzzle title.",true);
+    return;
+  }
 
   if(!fen||!sanText||!$("rating").value){
 
@@ -533,7 +680,6 @@ $("uploadBtn").addEventListener("click",async()=>{
 
   try{
 
-    // Validate SAN and convert to UCI.
     moves=convertSANtoUCI(fen,sanText);
 
   }catch(e){
@@ -566,23 +712,37 @@ $("uploadBtn").addEventListener("click",async()=>{
 
   try{
 
-    await window.PF.uploadPuzzle({
+    const uploaded=await window.PF.uploadPuzzle({
+
+      title,
+      description,
       fen,
       moves,
       rating,
       themes,
       gameUrl
+
     });
 
+    $("title").value="";
+    $("description").value="";
     $("fen").value="";
     $("moves").value="";
     $("rating").value="";
     $("themes").value="";
     $("gameUrl").value="";
 
-    message("Puzzle uploaded successfully.");
+    message("Puzzle uploaded successfully!");
 
     await loadPuzzles();
+
+    // Show the newly uploaded puzzle ID.
+    if(uploaded?.id){
+
+      message(
+        "Puzzle published successfully! ID: "+uploaded.id
+      );
+    }
 
   }catch(e){
 
@@ -596,15 +756,23 @@ $("uploadBtn").addEventListener("click",async()=>{
   }
 });
 
+/* ---------------- AUTH LISTENER ---------------- */
+
 window.addEventListener("puzzleforge:auth",e=>{
 
   user=e.detail?.user??window.PF?.user??null;
 
   renderAuth();
+
   loadPuzzles();
 });
 
-window.addEventListener("puzzleforge:cloud-synced",loadPuzzles);
+window.addEventListener(
+  "puzzleforge:cloud-synced",
+  loadPuzzles
+);
+
+/* ---------------- INITIALIZATION ---------------- */
 
 async function init(){
 
@@ -623,7 +791,8 @@ init().catch(e=>{
 
   console.error(e);
 
-  $("account").textContent="Firebase initialization failed";
+  $("account").textContent=
+    "Firebase initialization failed";
 });
 
 })();
