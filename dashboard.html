@@ -6,128 +6,370 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#090b10">
 <title>Dashboard — PuzzleForge</title>
+
 <style>
-:root{color-scheme:dark;--bg:#090b10;--panel:#171b24;--line:#292f3b;--text:#f4f5f7;--muted:#9299a8;--gold:#cbb36a}
+:root{
+color-scheme:dark;
+--bg:#090b10;
+--panel:#171b24;
+--line:#292f3b;
+--text:#f4f5f7;
+--muted:#9299a8;
+--gold:#cbb36a
+}
+
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,Arial,sans-serif}
-.container{width:min(1050px,calc(100% - 32px));margin:auto}
-header{border-bottom:1px solid var(--line);padding:17px 0}
-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.brand{font-size:20px;font-weight:750;text-decoration:none;color:white}
-nav a,.btn{color:var(--text);text-decoration:none;background:#171b24;border:1px solid #343b48;border-radius:8px;padding:9px 13px;font-size:13px}
-nav a:hover,.btn:hover{border-color:var(--gold)}
+
+body{
+margin:0;
+background:var(--bg);
+color:var(--text);
+font:15px/1.5 system-ui,Arial,sans-serif
+}
+
+.container{
+width:min(1050px,calc(100% - 32px));
+margin:auto
+}
+
+header{
+border-bottom:1px solid var(--line);
+padding:17px 0
+}
+
+nav{
+display:flex;
+align-items:center;
+justify-content:space-between;
+gap:12px;
+flex-wrap:wrap
+}
+
+.brand{
+font-size:20px;
+font-weight:750;
+text-decoration:none;
+color:white
+}
+
+nav a,.btn{
+color:var(--text);
+text-decoration:none;
+background:#171b24;
+border:1px solid #343b48;
+border-radius:8px;
+padding:9px 13px;
+font-size:13px
+}
+
+nav a:hover,.btn:hover{
+border-color:var(--gold)
+}
+
 main{padding:35px 0 60px}
-h1{font-size:32px;margin:0 0 5px}
-h2{font-size:17px;margin:0 0 5px}
-.muted{color:var(--muted);font-size:13px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin-top:22px}
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}
-.value{font-size:27px;font-weight:750;margin-top:8px}
-.label{color:var(--muted);font-size:12px}
-input{width:100%;background:#0e121a;border:1px solid #343b48;border-radius:8px;padding:11px;color:white;margin:6px 0 13px}
-input:read-only{opacity:.75;cursor:default;border-color:#292f3b}
-button{cursor:pointer}
-.action{background:var(--gold);color:#111;border:0;border-radius:8px;padding:10px 15px;font-weight:700}
-.action:hover{filter:brightness(1.08)}
-.message{font-size:12px;margin-left:8px;color:#a9c99b}
-.links{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
-.links a{padding:11px 14px;background:#10141d;border:1px solid var(--line);border-radius:9px;text-decoration:none;font-size:13px}
+
+h1{
+font-size:32px;
+margin:0 0 5px
+}
+
+h2{
+font-size:17px;
+margin:0 0 5px
+}
+
+.muted{
+color:var(--muted);
+font-size:13px
+}
+
+.card{
+background:var(--panel);
+border:1px solid var(--line);
+border-radius:13px;
+padding:20px
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:15px;
+margin-top:22px
+}
+
+.stats{
+display:grid;
+grid-template-columns:repeat(4,minmax(0,1fr));
+gap:12px;
+margin:20px 0
+}
+
+.value{
+font-size:27px;
+font-weight:750;
+margin-top:8px
+}
+
+.label{
+color:var(--muted);
+font-size:12px
+}
+
+.links{
+display:flex;
+gap:9px;
+flex-wrap:wrap;
+margin-top:20px
+}
+
+.links a{
+padding:11px 14px;
+background:#10141d;
+border:1px solid var(--line);
+border-radius:9px;
+text-decoration:none;
+font-size:13px
+}
+
+/* GOOGLE ACCOUNT */
+
+.account-card{
+margin-top:22px
+}
+
+.account-header{
+display:flex;
+align-items:center;
+gap:13px;
+margin-bottom:18px
+}
+
+.account-icon{
+width:43px;
+height:43px;
+flex-shrink:0;
+display:grid;
+place-items:center;
+background:#252b37;
+border:1px solid #343b48;
+border-radius:50%;
+font-size:21px
+}
+
+.account-header h2{
+margin:0
+}
+
+.account-grid{
+display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:13px
+}
+
+.account-item{
+background:#10141d;
+border:1px solid var(--line);
+border-radius:9px;
+padding:14px;
+min-width:0
+}
+
+.account-item .label{
+margin-bottom:6px
+}
+
+.account-value{
+font-size:15px;
+font-weight:650;
+overflow-wrap:anywhere;
+min-height:23px
+}
+
+.account-status{
+font-size:11px;
+color:#a9c99b;
+margin-top:13px
+}
+
 @media(max-width:700px){
-.stats{grid-template-columns:repeat(2,1fr)}
-.grid{grid-template-columns:1fr}
+
+.stats{
+grid-template-columns:repeat(2,1fr)
+}
+
+.grid{
+grid-template-columns:1fr
+}
+
 h1{font-size:27px}
+
+.account-grid{
+grid-template-columns:1fr
+}
+
 }
 </style>
 </head>
+
 <body>
 
 <header>
 <div class="container">
 <nav>
+
 <a class="brand" href="index.html">♟ PuzzleForge</a>
+
 <div>
 <a href="index.html">Home</a>
 <a href="stats.html">Statistics</a>
 <a href="library.html">Library</a>
 </div>
+
 </nav>
 </div>
 </header>
 
 <main class="container">
+
 <h1>Dashboard</h1>
-<p class="muted" id="account">Loading account…</p>
 
-<section class="card" style="margin-top:22px">
-<h2>My Profile</h2>
-<p class="muted">Your PuzzleForge identity</p>
+<p class="muted" id="account">
+Loading account…
+</p>
 
-<label class="muted" for="fullName">Full Name</label>
-<input id="fullName" maxlength="60" placeholder="Your full name">
+<!-- GOOGLE ACCOUNT -->
 
-<label class="muted" for="username">Username</label>
-<input id="username" maxlength="30" placeholder="Your username">
+<section class="card account-card">
 
-<button class="action" id="saveProfile" type="button">Save Profile</button>
-<span class="message" id="profileMessage" aria-live="polite"></span>
+<div class="account-header">
+
+<div class="account-icon">♟</div>
+
+<div>
+<h2>Google Account</h2>
+<p class="muted" style="margin:3px 0 0">
+Your signed-in Google account information
+</p>
+</div>
+
+</div>
+
+<div class="account-grid">
+
+<div class="account-item">
+
+<div class="label">Display Name</div>
+
+<div class="account-value" id="accountName">
+Loading...
+</div>
+
+</div>
+
+<div class="account-item">
+
+<div class="label">Gmail Address</div>
+
+<div class="account-value" id="accountEmail">
+Loading...
+</div>
+
+</div>
+
+</div>
+
+<div class="account-status" id="accountStatus">
+Checking authentication...
+</div>
+
 </section>
 
+<!-- PUZZLE STATISTICS -->
+
 <section class="stats">
+
 <div class="card">
 <div class="label">Puzzles completed</div>
 <div class="value" id="solved">0</div>
 </div>
+
 <div class="card">
 <div class="label">Solved without hints</div>
 <div class="value" id="noHint">0</div>
 </div>
+
 <div class="card">
 <div class="label">Accuracy</div>
 <div class="value" id="accuracy">0%</div>
 </div>
+
 <div class="card">
 <div class="label">Current streak</div>
 <div class="value" id="streak">0</div>
 </div>
+
 </section>
 
+<!-- OTHER DASHBOARD SECTIONS -->
+
 <section class="grid">
+
 <div class="card">
+
 <h2>Woodpecker Records</h2>
-<p class="muted">Your lifetime training records</p>
+
+<p class="muted">
+Your lifetime training records
+</p>
 
 <div class="stats" style="grid-template-columns:repeat(2,1fr)">
+
 <div>
 <div class="label">Rounds</div>
 <div class="value" id="rounds">0</div>
 </div>
+
 <div>
 <div class="label">Puzzles played</div>
 <div class="value" id="woodPuzzles">0</div>
 </div>
+
 <div>
 <div class="label">Best time</div>
 <div class="value" id="best">—</div>
 </div>
+
 <div>
 <div class="label">Fewest mistakes</div>
 <div class="value" id="mistakes">—</div>
 </div>
+
 </div>
 </div>
 
 <div class="card">
+
 <h2>Training Workspace</h2>
-<p class="muted">Continue your chess training.</p>
+
+<p class="muted">
+Continue your chess training.
+</p>
+
 <div class="links">
+
 <a href="puzzle-arena.html">♟ Puzzle Contriving</a>
+
 <a href="woodpecker.html">⚡ Woodpecker</a>
+
 <a href="stats.html">📊 Statistics</a>
+
 <a href="library.html">📚 Puzzle Library</a>
+
 </div>
 </div>
+
 </section>
+
 </main>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -143,223 +385,221 @@ const $=id=>document.getElementById(id);
 
 const keys={
  progress:"puzzleforge_progress_v1",
- profile:"puzzleforge_profile_v1",
  wood:"puzzleforge_woodpecker_v1"
 };
 
-let editingProfile=false;
-
 function read(key){
- try{
-  return JSON.parse(localStorage.getItem(key)||"{}");
- }catch(e){
-  return {};
- }
+try{
+return JSON.parse(localStorage.getItem(key)||"{}");
+}catch(e){
+return {};
+}
 }
 
-function write(key,value){
- localStorage.setItem(key,JSON.stringify(value));
- window.PF?.scheduleSync?.();
+/* GOOGLE ACCOUNT DISPLAY */
+
+function renderAccount(user){
+
+if(user){
+
+$("accountName").textContent=
+user.displayName||"Google User";
+
+$("accountEmail").textContent=
+user.email||"Email unavailable";
+
+$("account").textContent=
+"Signed in as "+(user.displayName||user.email||"Google User");
+
+$("accountStatus").textContent=
+"✓ Google account connected";
+
+}else{
+
+$("accountName").textContent="Guest";
+
+$("accountEmail").textContent="Not signed in";
+
+$("account").textContent=
+"Browsing as guest · Sign in from Home to sync";
+
+$("accountStatus").textContent=
+"Sign in with Google to connect your account";
+
 }
 
-function hasProfile(profile){
- return Boolean(
-  (profile.fullName||"").trim() &&
-  (profile.username||"").trim()
- );
 }
 
-/* PROFILE DISPLAY */
-function renderProfile(){
- const profile=read(keys.profile);
- const saved=hasProfile(profile);
-
- if(!editingProfile){
-  $("fullName").value=profile.fullName||"";
-  $("username").value=profile.username||"";
- }
-
- const locked=saved&&!editingProfile;
-
- $("fullName").readOnly=locked;
- $("username").readOnly=locked;
-
- $("saveProfile").textContent=
-  saved
-   ?(editingProfile?"Save Changes":"Edit Profile")
-   :"Save Profile";
-}
+/* DATE AND STREAK */
 
 function dateKey(d){
- return d.getFullYear()+"-"+
- String(d.getMonth()+1).padStart(2,"0")+"-"+
- String(d.getDate()).padStart(2,"0");
+
+return d.getFullYear()+"-"+
+String(d.getMonth()+1).padStart(2,"0")+"-"+
+String(d.getDate()).padStart(2,"0");
+
 }
 
 function streak(dates){
- const set=new Set(Array.isArray(dates)?dates:[]);
- let d=new Date();
- d.setHours(0,0,0,0);
 
- if(!set.has(dateKey(d))){
-  d.setDate(d.getDate()-1);
- }
+const set=new Set(Array.isArray(dates)?dates:[]);
 
- let n=0;
+let d=new Date();
 
- while(set.has(dateKey(d))){
-  n++;
-  d.setDate(d.getDate()-1);
- }
+d.setHours(0,0,0,0);
 
- return n;
+if(!set.has(dateKey(d))){
+d.setDate(d.getDate()-1);
 }
 
+let n=0;
+
+while(set.has(dateKey(d))){
+n++;
+d.setDate(d.getDate()-1);
+}
+
+return n;
+
+}
+
+/* TIME FORMAT */
+
 function time(ms){
- if(!Number.isFinite(ms)||ms<0)return "—";
 
- let s=Math.floor(ms/1000);
+if(!Number.isFinite(ms)||ms<0)return "—";
 
- return String(Math.floor(s/60)).padStart(2,"0")+":"+
- String(s%60).padStart(2,"0");
+let s=Math.floor(ms/1000);
+
+return String(Math.floor(s/60)).padStart(2,"0")+":"+
+String(s%60).padStart(2,"0");
+
 }
 
 /* DASHBOARD RENDER */
+
 function render(){
- const p=read(keys.progress);
- const w=read(keys.wood);
 
- renderProfile();
+const p=read(keys.progress);
 
- $("solved").textContent=
-  Array.isArray(p.solvedIds)?p.solvedIds.length:0;
+const w=read(keys.wood);
 
- $("noHint").textContent=
-  Array.isArray(p.noHintIds)?p.noHintIds.length:0;
+/* Puzzle statistics */
 
- const a=Number(p.totalAttempts)||0;
- const c=Number(p.correctMoves)||0;
+$("solved").textContent=
+Array.isArray(p.solvedIds)?p.solvedIds.length:0;
 
- $("accuracy").textContent=
-  (a?Math.round(c/a*100):0)+"%";
+$("noHint").textContent=
+Array.isArray(p.noHintIds)?p.noHintIds.length:0;
 
- $("streak").textContent=streak(p.solvedDates);
+const a=Number(p.totalAttempts)||0;
 
- const h=Array.isArray(w.history)?w.history:[];
- const l=w.lifetimeStats||{};
+const c=Number(p.correctMoves)||0;
 
- $("rounds").textContent=Number(l.rounds)||h.length;
+$("accuracy").textContent=
+(a?Math.round(c/a*100):0)+"%";
 
- $("woodPuzzles").textContent=
-  Number(l.puzzles)||
-  h.reduce((n,r)=>n+(Number(r.count)||0),0);
+$("streak").textContent=
+streak(p.solvedDates);
 
- const times=h
-  .map(r=>Number(r.milliseconds))
-  .filter(n=>n>0);
+/* Woodpecker records */
 
- const best=
-  Number.isFinite(Number(l.bestMilliseconds))&&
-  l.bestMilliseconds!==null
-   ?Number(l.bestMilliseconds)
-   :(times.length?Math.min(...times):null);
+const h=Array.isArray(w.history)?w.history:[];
 
- const ms=h
-  .map(r=>Number(r.mistakes))
-  .filter(n=>n>=0);
+const l=w.lifetimeStats||{};
 
- const few=
-  Number.isFinite(Number(l.fewestMistakes))&&
-  l.fewestMistakes!==null
-   ?Number(l.fewestMistakes)
-   :(ms.length?Math.min(...ms):null);
+$("rounds").textContent=
+Number(l.rounds)||h.length;
 
- $("best").textContent=best===null?"—":time(best);
- $("mistakes").textContent=few===null?"—":few;
+$("woodPuzzles").textContent=
+Number(l.puzzles)||
+h.reduce((n,r)=>n+(Number(r.count)||0),0);
+
+const times=h
+.map(r=>Number(r.milliseconds))
+.filter(n=>n>0);
+
+const best=
+Number.isFinite(Number(l.bestMilliseconds))&&
+l.bestMilliseconds!==null
+?Number(l.bestMilliseconds)
+:(times.length?Math.min(...times):null);
+
+const ms=h
+.map(r=>Number(r.mistakes))
+.filter(n=>n>=0);
+
+const few=
+Number.isFinite(Number(l.fewestMistakes))&&
+l.fewestMistakes!==null
+?Number(l.fewestMistakes)
+:(ms.length?Math.min(...ms):null);
+
+$("best").textContent=
+best===null?"—":time(best);
+
+$("mistakes").textContent=
+few===null?"—":few;
+
 }
 
-/* SAVE / EDIT PROFILE */
-$("saveProfile").addEventListener("click",()=>{
- const profile=read(keys.profile);
- const saved=hasProfile(profile);
+/* LIVE STORAGE UPDATES */
 
- // Existing profile: enter edit mode.
- if(saved&&!editingProfile){
-  editingProfile=true;
-  $("profileMessage").textContent="You can now edit your profile.";
-
-  renderProfile();
-  $("fullName").focus();
-  return;
- }
-
- const fullName=$("fullName").value.trim();
-
- const username=$("username").value
-  .trim()
-  .replace(/^@+/,"");
-
- if(!fullName||!username){
-  $("profileMessage").textContent="Enter both fields.";
-  return;
- }
-
- if(username.length>30){
-  $("profileMessage").textContent="Username must be 30 characters or less.";
-  return;
- }
-
- // Save new profile or update existing profile.
- write(keys.profile,{
-  ...profile,
-  fullName,
-  username
- });
-
- editingProfile=false;
-
- renderProfile();
-
- $("profileMessage").textContent=
-  saved
-   ?"Profile updated successfully."
-   :"Profile saved successfully.";
-});
-
-/* LIVE UPDATES */
 window.addEventListener("storage",render);
 
-window.addEventListener("puzzleforge:cloud-synced",()=>{
- editingProfile=false;
- render();
-});
+/* FIREBASE AUTH UPDATES */
 
 window.addEventListener("puzzleforge:auth",e=>{
- const u=e.detail?.user??window.PF?.user;
 
- $("account").textContent=u
-  ?"Signed in as "+(u.displayName||u.email)
-  :"Browsing as guest · Sign in from Home to sync";
+const user=e.detail?.user??window.PF?.user;
+
+renderAccount(user);
+
+});
+
+/* CLOUD SYNC */
+
+window.addEventListener("puzzleforge:cloud-synced",()=>{
+
+render();
+
+const user=window.PF?.user;
+
+if(user)renderAccount(user);
+
 });
 
 /* INITIALIZATION */
+
 async function init(){
- if(window.PF?.authReady){
-  await window.PF.authReady;
- }
 
- const u=window.PF?.user;
-
- $("account").textContent=u
-  ?"Signed in as "+(u.displayName||u.email)
-  :"Browsing as guest · Sign in from Home to sync";
-
- render();
+if(window.PF?.authReady){
+await window.PF.authReady;
 }
 
-init().catch(console.error);
+/* Get Firebase authenticated user */
+
+const user=window.PF?.user??null;
+
+renderAccount(user);
+
+render();
+
+}
+
+/* START */
+
+init().catch(error=>{
+
+console.error("Dashboard initialization error:",error);
+
+$("accountStatus").textContent=
+"Could not load account information.";
+
+});
 
 })();
 </script>
+
 </body>
 </html>
