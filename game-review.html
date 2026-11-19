@@ -68,7 +68,7 @@ box-shadow:0 1px 4px rgba(0,0,0,.4);
 pointer-events:none;
 }
 
-/* UPDATED BOARD COORDINATES */
+/* BOARD COORDINATES */
 .coord{
 position:absolute;
 z-index:4;
@@ -85,11 +85,11 @@ opacity:.9;
 pointer-events:none;
 }
 
-/* Rank numbers: upper-left corner */
+/* Rank numbers: upper-right corner */
 .coord.rank{
-left:3px;
+right:3px;
 top:3px;
-right:auto;
+left:auto;
 bottom:auto;
 }
 
@@ -700,15 +700,15 @@ badge.title=m.classification;
 s.appendChild(badge)
 }
 
-/* Rank notation: upper-left, no background */
-if(c===0){
+/* Rank notation: upper-right corner */
+if(c===7){
 const q=document.createElement("span");
 q.className="coord rank";
 q.textContent=8-r;
 s.appendChild(q)
 }
 
-/* File notation: lower-left, no background */
+/* File notation: lower-left corner */
 if(r===7){
 const q=document.createElement("span");
 q.className="coord file";
@@ -905,28 +905,8 @@ $("reviewSection").scrollIntoView({behavior:"smooth"});
 message("Game loaded successfully. Press Analyse Game to begin.")
 }
 
-function restoreLastReview(){
-try{
-const saved=localStorage.getItem("pf_review_pgn");
-if(!saved)return;
-loadText(saved);
-const rawIndex=localStorage.getItem("pf_review_game_index"),idx=clamp(Number(rawIndex)||0,0,Math.max(0,games.length-1));
-$("gamePicker").value=String(idx);
-if(!games[idx])return;
-startGame(games[idx].game);
+/* Automatic previous-game restoration removed. */
 
-const cached=JSON.parse(localStorage.getItem("pf_review_results")||"null");
-if(cached&&cached.index===idx&&Array.isArray(cached.results)&&cached.results.length===games[idx].game.plies.length){
-results=cached.results;
-renderSummary();renderMoves();renderGraph();renderMove(0);
-$("analysisProgress").textContent="Restored your previous analysis from this browser.";
-$("engineStatus").textContent="Previous Stockfish analysis restored · depth "+cached.depth;
-}
-message("Previous game restored. No need to fetch it again.")
-}catch(e){console.warn("Could not restore previous PuzzleForge review:",e)}
-}
-
-window.addEventListener("DOMContentLoaded",restoreLastReview);
 })();
 </script>
 </body>
