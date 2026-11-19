@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -485,6 +484,19 @@ function startStockfish(){
   }
 }
 
+/*
+  Stockfish score handling.
+
+  Centipawn scores are converted into pawns.
+
+  Mate scores are kept as mate scores.
+  They are NEVER converted into 10000 pawns.
+
+  Returned score format:
+  {type:"cp", value:1.25}
+  {type:"mate", value:3}
+*/
+
 function scoreToWhite(message,fen){
   const m = message.match(/\bscore (cp|mate) (-?\d+)/);
   if(!m) return null;
@@ -492,16 +504,67 @@ function scoreToWhite(message,fen){
   const stm = fen.split(" ")[1];
   const value = Number(m[2]);
 
+  const whitePerspective = stm === "w" ? value : -value;
+
   if(m[1] === "mate"){
-    const white = stm === "w" ? value : -value;
-    return white>0 ? 10000-white : white<0 ? -10000-white : 0;
+    return {
+      type:"mate",
+      value:whitePerspective
+    };
   }
 
-  const cp = value/100;
-  return stm === "w" ? cp : -cp;
+  return {
+    type:"cp",
+    value:whitePerspective/100
+  };
 }
 
-function analyzeFen(fen,depth=12){
+/*
+  Converts a white-perspective score into the perspective
+  of the player who made the move.
+*/
+
+function scoreForColor(score,color){
+  if(!score) return null;
+
+  const sign = color==="w" ? 1 : -1;
+
+  return {
+    type:score.type,
+    value:score.value*sign
+  };
+}
+
+/*
+  Internal comparison helper.
+
+  Mate scores are ranked above ordinary evaluations,
+  but this number is never displayed to the user.
+*/
+
+function scoreRank(score){
+  if(!score) return null;
+
+  if(score.type==="cp"){
+    return score.value;
+  }
+
+  if(score.type==="mate"){
+    if(score.value>0){
+      return 100000-(score.value*100);
+    }
+
+    if(score.value<0){
+      return -100000-(score.value*100);
+    }
+
+    return 0;
+  }
+
+  return null;
+}
+
+function analyzeFen(fen,depth=15){
   return new Promise((resolve,reject)=>{
     if(!stockfishWorker || !engineReady){
       reject(new Error("Engine not ready"));
@@ -514,12 +577,24 @@ function analyzeFen(fen,depth=12){
 
     const baseHandler = stockfishWorker.onmessage;
 
-    const timeout = setTimeout(()=>{
+    const finish = (error,result)=>{
       if(done) return;
+
       done = true;
+      clearTimeout(timeout);
+
       stockfishWorker.onmessage = baseHandler;
-      reject(new Error("Analysis timed out"));
-    },18000);
+
+      if(error){
+        reject(error);
+      }else{
+        resolve(result);
+      }
+    };
+
+    const timeout = setTimeout(()=>{
+      finish(new Error("Analysis timed out"));
+    },25000);
 
     stockfishWorker.onmessage = event=>{
       const msg = typeof event.data === "string"
@@ -528,20 +603,23 @@ function analyzeFen(fen,depth=12){
 
       if(msg.startsWith("info ")){
         const value = scoreToWhite(msg,fen);
-        if(value !== null) score = value;
+
+        if(value !== null){
+          score = value;
+        }
       }
 
       if(msg.startsWith("bestmove")){
-        if(done) return;
-
-        done = true;
-        clearTimeout(timeout);
-
         const match = msg.match(/^bestmove\s+(\S+)/);
-        bestMove = match && match[1] !== "(none)" ? match[1] : null;
 
-        stockfishWorker.onmessage = baseHandler;
-        resolve({score,bestMove});
+        bestMove = match && match[1] !== "(none)"
+          ? match[1]
+          : null;
+
+        finish(null,{
+          score,
+          bestMove
+        });
       }
     };
 
@@ -557,17 +635,17 @@ function uciToSan(fen,uci){
     const temp = new Chess(fen);
 
     const move = temp.move({
-      from: uci.slice(0,2),
-      to: uci.slice(2,4),
-      promotion: uci.length>4 ? uci[4] : "q"
+      from:uci.slice(0,2),
+      to:uci.slice(2,4),
+      promotion:uci.length>4 ? uci[4] : "q"
     });
 
     return move ? {
-      san: move.san,
-      flags: move.flags,
-      captured: move.captured || null,
-      checkmate: temp.in_checkmate(),
-      check: temp.in_check()
+      san:move.san,
+      flags:move.flags,
+      captured:move.captured || null,
+      checkmate:temp.in_checkmate(),
+      check:temp.in_check()
     } : null;
   }catch(e){
     return null;
@@ -585,21 +663,27 @@ function pieceName(piece){
   })[piece] || "piece";
 }
 
+/*
+  Generates a human-readable explanation.
+
+  Important:
+  Mate scores and pawn scores are handled separately.
+  A mate score can never appear as an absurd pawn loss.
+*/
+
 function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
   if(!beforeResult || !afterResult ||
-     beforeResult.score===null || afterResult.score===null){
+     !beforeResult.score || !afterResult.score){
     return "Stockfish could not complete the evaluation.";
   }
 
-  const before = moverColor==="w"
-    ? beforeResult.score
-    : -beforeResult.score;
+  const before = scoreForColor(beforeResult.score,moverColor);
+  const after = scoreForColor(afterResult.score,moverColor);
 
-  const after = moverColor==="w"
-    ? afterResult.score
-    : -afterResult.score;
+  if(!before || !after){
+    return "Stockfish could not complete the evaluation.";
+  }
 
-  const loss = before-after;
   const reply = uciToSan(afterFen,afterResult.bestMove);
 
   let reason = "This reply creates a strong tactical or positional threat and leaves your position under pressure.";
@@ -620,15 +704,130 @@ function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
     ? "The opponent's strongest reply is "+reply.san+". "
     : "Stockfish could not identify a legal reply to display. ";
 
-  let evaluationText;
+  /*
+    Case 1:
+    After the move, the opponent has a forced checkmate.
+    Negative mate score from mover's perspective.
+  */
 
-  if(loss>=5) evaluationText = "The evaluation drops by about "+loss.toFixed(1)+" pawns.";
-  else if(loss>=2) evaluationText = "The evaluation drops by about "+loss.toFixed(1)+" pawns, a major disadvantage.";
-  else if(loss>=0.8) evaluationText = "The evaluation drops by about "+loss.toFixed(1)+" pawns, giving the opponent a clear advantage.";
-  else if(loss>=0.3) evaluationText = "The evaluation drops by about "+loss.toFixed(1)+" pawns, leaving you in a less comfortable position.";
-  else evaluationText = "The engine finds only a small evaluation change.";
+  if(after.type==="mate" && after.value<0){
+    const mateMoves = Math.abs(after.value);
 
-  return moveText+reason+" "+evaluationText;
+    return moveText+
+      "Your position is lost by forced checkmate. "+
+      "The opponent can force mate in approximately "+
+      mateMoves+" move"+(mateMoves===1?"":"s")+". "+
+      reason;
+  }
+
+  /*
+    Case 2:
+    The mover still has a forced checkmate.
+  */
+
+  if(after.type==="mate" && after.value>0){
+    return moveText+
+      "Despite this move, you still have a forced checkmate "+
+      "in approximately "+after.value+
+      " move"+(after.value===1?"":"s")+". "+
+      "The position remains winning.";
+  }
+
+  /*
+    Case 3:
+    Before the move, the mover had a forced mate,
+    but the move loses that opportunity.
+  */
+
+  if(before.type==="mate" && before.value>0 && after.type==="cp"){
+    return moveText+
+      "Before your move, you had a forced checkmate in "+
+      before.value+" move"+(before.value===1?"":"s")+
+      ", but this move misses that winning opportunity. "+
+      "The engine now evaluates the position at "+
+      (after.value>=0?"+":"")+
+      after.value.toFixed(2)+" pawns from your perspective.";
+  }
+
+  /*
+    Case 4:
+    The position was already lost by forced mate.
+  */
+
+  if(before.type==="mate" && before.value<0){
+    return moveText+
+      "The position was already evaluated as a forced checkmate "+
+      "against you before this move. "+
+      "This move does not remove that forced mate.";
+  }
+
+  /*
+    Case 5:
+    Mate score changes into another mate score.
+  */
+
+  if(before.type==="mate" && after.type==="mate"){
+    if(before.value>0 && after.value<0){
+      return moveText+
+        "This move changes a winning forced-mate position "+
+        "into a forced checkmate against you.";
+    }
+
+    if(before.value<0 && after.value>0){
+      return moveText+
+        "The engine now finds a forced checkmate for you.";
+    }
+
+    return moveText+
+      "The position contains a forced checkmate sequence. "+
+      "The engine's mate evaluation has changed after this move.";
+  }
+
+  /*
+    Case 6:
+    Normal centipawn evaluation.
+  */
+
+  if(before.type==="cp" && after.type==="cp"){
+    const loss = before.value-after.value;
+
+    let evaluationText;
+
+    if(loss>=5){
+      evaluationText =
+        "The evaluation drops by about "+
+        loss.toFixed(2)+" pawns.";
+    }else if(loss>=2){
+      evaluationText =
+        "The evaluation drops by about "+
+        loss.toFixed(2)+" pawns, a major disadvantage.";
+    }else if(loss>=0.8){
+      evaluationText =
+        "The evaluation drops by about "+
+        loss.toFixed(2)+
+        " pawns, giving the opponent a clear advantage.";
+    }else if(loss>=0.3){
+      evaluationText =
+        "The evaluation drops by about "+
+        loss.toFixed(2)+
+        " pawns, leaving you in a less comfortable position.";
+    }else if(loss>0){
+      evaluationText =
+        "The evaluation changes slightly, by about "+
+        loss.toFixed(2)+" pawns.";
+    }else{
+      evaluationText =
+        "The engine finds no significant evaluation loss "+
+        "in this position.";
+    }
+
+    return moveText+reason+" "+evaluationText;
+  }
+
+  return moveText+
+    reason+
+    " The engine's evaluation changed, but it could not "+
+    "produce a reliable numerical comparison.";
 }
 
 function restoreAfterWrongMove(){
@@ -656,7 +855,7 @@ async function explainWrongMove(beforeFen,afterFen,moverColor){
   const job = engineQueue.then(async()=>{
     let tries = 0;
 
-    while(!engineReady && !engineFailed && tries<100){
+    while(!engineReady && !engineFailed && tries<125){
       await new Promise(r=>setTimeout(r,200));
       tries++;
     }
@@ -786,7 +985,6 @@ function normalizePuzzle(puzzle,isCommunity=false){
     rating: Number(puzzle.rating) || 1500,
     themes: Array.isArray(puzzle.themes) ? puzzle.themes : [],
 
-    // Community uploads start directly from the supplied FEN.
     _solverStartsFromFen: isCommunity
   };
 }
@@ -805,10 +1003,8 @@ async function loadPuzzles(){
       throw new Error("Puzzle database is empty.");
     }
 
-    // Built-in puzzles retain their original format.
     puzzles = basePuzzles.map(p=>normalizePuzzle(p,false)).filter(Boolean);
 
-    // Load public community puzzles.
     if(window.PF && typeof PF.getPublicPuzzles==="function"){
       try{
         const result = await PF.getPublicPuzzles();
@@ -820,7 +1016,6 @@ async function loadPuzzles(){
         const existingIds = new Set(puzzles.map(p=>String(p.id)));
 
         publicPuzzles.forEach(raw=>{
-          // Community uploads use the supplied FEN as the actual start.
           const puzzle = normalizePuzzle(raw,true);
 
           if(puzzle && !existingIds.has(String(puzzle.id))){
@@ -842,7 +1037,6 @@ async function loadPuzzles(){
         puzzle => String(puzzle.id) === String(requestedId)
       );
 
-      // Fetch requested community puzzle directly if necessary.
       if(
         requestedPuzzleIndex < 0 &&
         window.PF &&
@@ -850,8 +1044,6 @@ async function loadPuzzles(){
       ){
         try{
           const rawPuzzle = await PF.getPublicPuzzle(requestedId);
-
-          // Directly requested records are community uploads.
           const requestedPuzzle = normalizePuzzle(rawPuzzle,true);
 
           if(requestedPuzzle){
@@ -1015,33 +1207,11 @@ function startPuzzle(index){
 
     if(currentPuzzle._solverStartsFromFen){
 
-      /*
-        COMMUNITY PUZZLE:
-
-        Do NOT automatically play moves[0].
-
-        The supplied FEN already represents the position
-        where the solver must play.
-
-        Example:
-        FEN side-to-move = White
-        moves[0] = White's first solution move
-
-        Therefore the solver starts as White.
-      */
-
       puzzleMoveIndex = 0;
 
       flipped = game.turn()==="b";
 
     }else{
-
-      /*
-        BUILT-IN PUZZLE:
-
-        Original Lichess-style format.
-        moves[0] is the opponent's setup move.
-      */
 
       if(moves.length<2){
         throw new Error("Built-in puzzle needs at least two moves.");
