@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -266,11 +265,44 @@ text-transform:uppercase;
 
 .stat strong{font-size:22px}
 
+.category-panel{
+background:var(--panel);
+border:1px solid var(--line);
+border-radius:13px;
+padding:15px;
+margin:14px 0;
+}
+
+.category-grid{
+display:grid;
+grid-template-columns:repeat(3,minmax(0,1fr));
+gap:8px;
+margin-top:12px;
+}
+
+.category-stat{
+background:var(--panel2);
+border:1px solid var(--line);
+border-radius:8px;
+padding:10px;
+min-width:0;
+}
+
+.category-stat small{
+display:block;
+font-size:10px;
+color:var(--muted);
+}
+
+.category-stat strong{
+font-size:20px;
+}
+
 .moves{
 display:flex;
 flex-wrap:wrap;
 gap:5px;
-max-height:210px;
+max-height:250px;
 overflow:auto;
 margin-top:10px;
 }
@@ -294,6 +326,12 @@ color:#fff;
 .move.bad{color:#ed9a9a}
 .move.good{color:#a8d5b2}
 
+.move.brilliant{color:#65d9d0}
+.move.great{color:#b9a0ed}
+.move.best{color:#a8d5b2}
+.move.excellent{color:#8ec7a0}
+.move.miss{color:#e5a66d}
+
 .graph{
 width:100%;
 height:105px;
@@ -309,13 +347,39 @@ border-radius:9px;
 margin-top:10px;
 }
 
+.classification-badge{
+display:inline-block;
+padding:5px 10px;
+border-radius:6px;
+font-size:12px;
+font-weight:800;
+margin-bottom:8px;
+background:#252b36;
+color:white;
+}
+
+.badge-brilliant{background:#174b4a;color:#75e3d9}
+.badge-great{background:#392c59;color:#c6adff}
+.badge-best{background:#244b35;color:#a8e2b8}
+.badge-excellent{background:#244333;color:#9cdbad}
+.badge-good{background:#303e32;color:#b6d8a5}
+.badge-inaccuracy{background:#514622;color:#ead17c}
+.badge-mistake{background:#583b24;color:#f0b17d}
+.badge-miss{background:#633d27;color:#ffb77e}
+.badge-blunder{background:#582b32;color:#f19ba2}
+
 .hide{display:none!important}
 
 @media(max-width:800px){
 .grid{grid-template-columns:1fr}
 .stats{grid-template-columns:repeat(2,1fr)}
+.category-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .wrap{margin-top:20px}
 .board{max-width:560px;margin:auto}
+}
+
+@media(max-width:380px){
+.category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 </style>
 </head>
@@ -353,9 +417,7 @@ Choose a source or paste a PGN.
 <div class="tabs">
 
 <button class="tab active" data-tab="pgn">PGN</button>
-
 <button class="tab" data-tab="lichess">Lichess</button>
-
 <button class="tab" data-tab="chesscom">Chess.com</button>
 
 </div>
@@ -387,13 +449,8 @@ Load PGN
 <label>Lichess username</label>
 
 <div class="row">
-
 <input id="lichessUser" placeholder="Username">
-
-<button class="btn primary" id="fetchLichess">
-Fetch Games
-</button>
-
+<button class="btn primary" id="fetchLichess">Fetch Games</button>
 </div>
 
 </div>
@@ -403,13 +460,8 @@ Fetch Games
 <label>Chess.com username</label>
 
 <div class="row">
-
 <input id="chesscomUser" placeholder="Username">
-
-<button class="btn primary" id="fetchChesscom">
-Fetch Games
-</button>
-
+<button class="btn primary" id="fetchChesscom">Fetch Games</button>
 </div>
 
 </div>
@@ -417,7 +469,6 @@ Fetch Games
 <div id="gamePickerWrap" class="hide">
 
 <label>Select game</label>
-
 <select id="gamePicker"></select>
 
 <button class="btn primary" id="useSelected">
@@ -460,6 +511,64 @@ Review Game
 Accuracy is a PuzzleForge estimate, not Chess.com's proprietary score.
 </p>
 
+<div class="category-panel">
+
+<h2>Move Classification</h2>
+
+<p class="muted" style="font-size:11px">
+Your move-by-move performance breakdown.
+</p>
+
+<div class="category-grid">
+
+<div class="category-stat">
+<small>Brilliant</small>
+<strong id="countBrilliant">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Great</small>
+<strong id="countGreat">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Best</small>
+<strong id="countBest">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Excellent</small>
+<strong id="countExcellent">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Good</small>
+<strong id="countGood">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Inaccuracy</small>
+<strong id="countInaccuracy">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Mistake</small>
+<strong id="countMistake">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Miss</small>
+<strong id="countMiss">0</strong>
+</div>
+
+<div class="category-stat">
+<small>Blunder</small>
+<strong id="countBlunder">0</strong>
+</div>
+
+</div>
+</div>
+
 <div class="grid">
 
 <div class="board-area panel">
@@ -482,15 +591,10 @@ Accuracy is a PuzzleForge estimate, not Chess.com's proprietary score.
 <div class="board" id="board"></div>
 
 <div class="controls">
-
 <button class="btn" id="firstMove">|◀</button>
-
 <button class="btn" id="prevMove">◀</button>
-
 <button class="btn" id="nextMove">▶</button>
-
 <button class="btn" id="lastMove">▶|</button>
-
 </div>
 
 </div>
@@ -501,7 +605,9 @@ Accuracy is a PuzzleForge estimate, not Chess.com's proprietary score.
 
 <h2>Evaluation Graph</h2>
 
-<svg class="graph" id="evalGraph" viewBox="0 0 600 120" preserveAspectRatio="none">
+<svg class="graph" id="evalGraph"
+viewBox="0 0 600 120"
+preserveAspectRatio="none">
 
 <path d="M0 60H600"
 stroke="#596273"
@@ -573,10 +679,32 @@ const $=id=>document.getElementById(id);
 
 const START="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+const CLASSIFICATIONS=[
+"Brilliant",
+"Great",
+"Best",
+"Excellent",
+"Good",
+"Inaccuracy",
+"Mistake",
+"Miss",
+"Blunder"
+];
+
+const MATERIAL={
+p:1,
+n:3,
+b:3,
+r:5,
+q:9,
+k:0
+};
+
 let games=[];
 let current=null;
 let results=[];
 let cursor=0;
+
 let worker=null;
 let readyPromise=null;
 let activeResolve=null;
@@ -589,22 +717,34 @@ $("importStatus").textContent=t;
 $("importStatus").className="status"+(error?" error":"");
 }
 
+/* ---------------- TABS ---------------- */
+
 document.querySelectorAll(".tab").forEach(btn=>{
+
 btn.onclick=()=>{
-document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+
+document.querySelectorAll(".tab")
+.forEach(x=>x.classList.remove("active"));
+
 btn.classList.add("active");
 
 ["pgn","lichess","chesscom"].forEach(n=>{
 $(n+"Tab").classList.toggle("hide",n!==btn.dataset.tab);
 });
+
 };
+
 });
 
+/* ---------------- PGN ---------------- */
+
 function splitPgn(text){
+
 return text.trim()
 .split(/(?=\[Event\s)/g)
 .map(x=>x.trim())
 .filter(Boolean);
+
 }
 
 function parseGame(pgn){
@@ -634,12 +774,14 @@ const m=replay.move(san,{sloppy:true});
 if(!m)throw Error("Invalid move: "+san);
 
 plies.push({
+
 san:m.san,
 uci:m.from+m.to+(m.promotion||""),
 color:m.color,
 before,
 after:replay.fen(),
 number:Math.ceil((i+1)/2)
+
 });
 
 });
@@ -696,13 +838,19 @@ $("pgnFile").onchange=async e=>{
 
 const f=e.target.files[0];
 
-if(f){
+if(!f)return;
+
+try{
 
 const t=await f.text();
 
 $("pgnInput").value=t;
 
 loadText(t);
+
+}catch(err){
+
+message("Could not read PGN file.",true);
 
 }
 
@@ -715,6 +863,8 @@ const g=games[Number($("gamePicker").value)];
 if(g)startGame(g.game);
 
 };
+
+/* ---------------- LICHESS ---------------- */
 
 async function fetchLichess(){
 
@@ -746,6 +896,8 @@ message(e.message,true);
 }
 
 $("fetchLichess").onclick=fetchLichess;
+
+/* ---------------- CHESS.COM ---------------- */
 
 async function fetchChesscom(){
 
@@ -801,6 +953,8 @@ message(e.message,true);
 
 $("fetchChesscom").onclick=fetchChesscom;
 
+/* ---------------- STOCKFISH ---------------- */
+
 function ensureEngine(){
 
 if(readyPromise)return readyPromise;
@@ -809,10 +963,13 @@ readyPromise=new Promise((resolve,reject)=>{
 
 worker=new Worker("engine/stockfish-19-lite-single.js");
 
-const timeout=setTimeout(
-()=>reject(Error("Stockfish startup timeout.")),
-30000
-);
+let readyTimeout=setTimeout(()=>{
+
+readyPromise=null;
+
+reject(Error("Stockfish startup timeout."));
+
+},30000);
 
 worker.onmessage=e=>{
 
@@ -823,22 +980,23 @@ const s=typeof e.data==="string"
 if(s==="uciok"){
 
 worker.postMessage("setoption name Threads value 1");
-
 worker.postMessage("setoption name Hash value 32");
-
 worker.postMessage("isready");
 
 }
 
 if(s==="readyok"){
 
-clearTimeout(timeout);
+clearTimeout(readyTimeout);
 
 $("engineStatus").textContent="Stockfish 19 Lite Ready";
 
 resolve();
 
 }
+
+/* Stockfish score is relative to the side to move.
+   Convert it to White's perspective. */
 
 if(s.startsWith("info ") && activeResolve){
 
@@ -847,14 +1005,23 @@ const m=s.match(/\bscore (cp|mate) (-?\d+)/);
 if(m){
 
 const val=Number(m[2]);
-
 const turn=window.analysisTurn||"w";
 
-activeScore=m[1]==="mate"
-?(turn==="w"
-?(val>0?10000-val:-10000-val)
-:(val>0?-10000+val:10000+val))
-:(turn==="w"?val/100:-val/100);
+if(m[1]==="mate"){
+
+const mateScore=10000-Math.min(999,Math.abs(val));
+
+activeScore=
+(turn==="w"?1:-1)*
+(val>=0?mateScore:-mateScore);
+
+}else{
+
+activeScore=turn==="w"
+?val/100
+:-val/100;
+
+}
 
 }
 
@@ -862,13 +1029,15 @@ activeScore=m[1]==="mate"
 
 if(s.startsWith("bestmove ") && activeResolve){
 
-const resolve=activeResolve;
+const done=activeResolve;
 
 activeResolve=null;
 
-resolve({
+done({
+
 score:activeScore,
 bestMove:s.split(/\s+/)[1]
+
 });
 
 }
@@ -877,7 +1046,9 @@ bestMove:s.split(/\s+/)[1]
 
 worker.onerror=()=>{
 
-clearTimeout(timeout);
+clearTimeout(readyTimeout);
+
+readyPromise=null;
 
 reject(Error("Stockfish failed to load."));
 
@@ -899,32 +1070,36 @@ activeScore=null;
 
 window.analysisTurn=fen.split(" ")[1];
 
-activeResolve=resolve;
+let finished=false;
 
 const timeout=setTimeout(()=>{
 
-if(activeResolve===resolve){
+if(finished)return;
 
+finished=true;
+
+if(activeResolve===finish)
 activeResolve=null;
 
 reject(Error("Analysis timeout."));
 
-}
-
 },45000);
 
-const original=resolve;
+function finish(data){
 
-activeResolve=x=>{
+if(finished)return;
+
+finished=true;
 
 clearTimeout(timeout);
 
-original(x);
+resolve(data);
 
-};
+}
+
+activeResolve=finish;
 
 worker.postMessage("position fen "+fen);
-
 worker.postMessage("go depth "+depth);
 
 });
@@ -935,14 +1110,14 @@ function sanFromUci(fen,uci){
 
 try{
 
+if(!uci||uci==="(none)"||uci==="0000")return "—";
+
 const g=new Chess(fen);
 
 const m=g.move({
 
 from:uci.slice(0,2),
-
 to:uci.slice(2,4),
-
 promotion:uci[4]||"q"
 
 });
@@ -957,9 +1132,123 @@ return uci;
 
 }
 
-function classify(loss,isBest){
+/* ---------------- CLASSIFICATION HELPERS ---------------- */
 
-if(isBest)return "Best";
+function moverEvaluation(score,color){
+
+return color==="w"?score:-score;
+
+}
+
+function getLegalMoveCount(fen){
+
+try{
+
+const g=new Chess(fen);
+
+return g.moves().length;
+
+}catch(e){
+
+return 0;
+
+}
+
+}
+
+/*
+  Detects a sound piece sacrifice.
+
+  The played move must be the engine's best move.
+  The opponent's best reply must capture the moved piece.
+  The captured piece must have meaningful material value.
+*/
+
+function isSoundSacrifice(position,afterAnalysis,loss,isBest){
+
+if(!isBest)return false;
+
+if(loss>0.12)return false;
+
+if(!afterAnalysis.bestMove)return false;
+
+try{
+
+const g=new Chess(position.after);
+
+const replyUci=afterAnalysis.bestMove;
+
+const reply=g.move({
+
+from:replyUci.slice(0,2),
+to:replyUci.slice(2,4),
+promotion:replyUci[4]||"q"
+
+});
+
+if(!reply)return false;
+
+const movedTo=position.uci.slice(2,4);
+
+if(reply.to!==movedTo)return false;
+
+if(!reply.captured)return false;
+
+const capturedValue=MATERIAL[reply.captured]||0;
+
+return capturedValue>=3;
+
+}catch(e){
+
+return false;
+
+}
+
+}
+
+/*
+  Classification order:
+
+  Brilliant: sound sacrifice confirmed by the engine.
+  Great: best move in a forced/very restricted position.
+  Best: engine's top move.
+  Miss: misses a significant winning advantage.
+  Remaining categories use evaluation loss.
+*/
+
+function classify(position,loss,isBest,afterAnalysis){
+
+const legalCount=getLegalMoveCount(position.before);
+
+const moverBefore=moverEvaluation(
+position.beforeScore,
+position.color
+);
+
+if(isSoundSacrifice(position,afterAnalysis,loss,isBest))
+return "Brilliant";
+
+if(
+isBest &&
+(
+legalCount===1 ||
+(position.san.includes("#"))
+)
+)
+return "Great";
+
+if(isBest)
+return "Best";
+
+/* Miss: the player had a clear winning advantage,
+   but the move gives away a substantial part of it. */
+
+if(
+moverBefore>=2.0 &&
+loss>=0.5 &&
+loss<1.5
+)
+return "Miss";
 
 if(loss<0.08)return "Excellent";
 
@@ -967,11 +1256,13 @@ if(loss<0.18)return "Good";
 
 if(loss<0.35)return "Inaccuracy";
 
-if(loss<0.65)return "Mistake";
+if(loss<0.75)return "Mistake";
 
 return "Blunder";
 
 }
+
+/* ---------------- ACCURACY ---------------- */
 
 function accuracy(color){
 
@@ -985,6 +1276,8 @@ return Math.max(0,100-avg*28).toFixed(1)+"%";
 
 }
 
+/* ---------------- ANALYSIS ---------------- */
+
 async function analyse(){
 
 if(!current||analysisBusy)return;
@@ -995,7 +1288,15 @@ const run=++latestAnalysis;
 
 $("analyseBtn").disabled=true;
 
+$("analysisProgress").classList.remove("error");
+
 results=[];
+
+cursor=0;
+
+renderSummary();
+renderMoves();
+renderGraph();
 
 $("analysisProgress").textContent="Starting engine...";
 
@@ -1019,27 +1320,41 @@ const bestSan=before.bestMove
 
 const after=await analyzeFen(p.after,depth);
 
+if(run!==latestAnalysis)break;
+
+/* Both evaluations are converted to White's perspective. */
+
 const loss=p.color==="w"
 ?before.score-after.score
 :after.score-before.score;
 
-const cleanLoss=Math.max(0,loss||0);
+const cleanLoss=Math.max(0,Number.isFinite(loss)?loss:0);
 
-const isBest=p.uci===before.bestMove;
+const isBest=
+!!before.bestMove &&
+p.uci===before.bestMove;
+
+const classification=classify({
+
+...p,
+beforeScore:before.score
+
+},cleanLoss,isBest,after);
 
 results.push({
 
 ...p,
 
 beforeScore:before.score,
-
 afterScore:after.score,
 
 bestMove:bestSan,
+bestUci:before.bestMove,
 
 loss:cleanLoss,
 
-classification:classify(cleanLoss,isBest)
+classification,
+isBest
 
 });
 
@@ -1049,9 +1364,7 @@ $("analysisProgress").textContent=
 "Analysed "+(i+1)+" / "+current.plies.length;
 
 renderSummary();
-
 renderMoves();
-
 renderGraph();
 
 }
@@ -1068,13 +1381,15 @@ renderMove(0);
 
 }catch(e){
 
+if(run===latestAnalysis){
+
 $("analysisProgress").textContent=e.message;
 
 $("analysisProgress").classList.add("error");
 
-}finally{
+}
 
-if(run===latestAnalysis){
+}finally{
 
 analysisBusy=false;
 
@@ -1084,9 +1399,9 @@ $("analyseBtn").disabled=false;
 
 }
 
-}
-
 $("analyseBtn").onclick=analyse;
+
+/* ---------------- SUMMARY ---------------- */
 
 function renderSummary(){
 
@@ -1094,15 +1409,38 @@ $("whiteAccuracy").textContent=accuracy("w");
 
 $("blackAccuracy").textContent=accuracy("b");
 
+const errors=[
+"Inaccuracy",
+"Mistake",
+"Miss",
+"Blunder"
+];
+
 $("whiteErrors").textContent=
-results.filter(x=>x.color==="w"&&
-["Inaccuracy","Mistake","Blunder"].includes(x.classification)).length;
+results.filter(x=>
+x.color==="w"&&errors.includes(x.classification)
+).length;
 
 $("blackErrors").textContent=
-results.filter(x=>x.color==="b"&&
-["Inaccuracy","Mistake","Blunder"].includes(x.classification)).length;
+results.filter(x=>
+x.color==="b"&&errors.includes(x.classification)
+).length;
+
+CLASSIFICATIONS.forEach(name=>{
+
+const count=results.filter(
+x=>x.classification===name
+).length;
+
+const id="count"+name.replace(/\s/g,"");
+
+if($(id))$(id).textContent=count;
+
+});
 
 }
+
+/* ---------------- MOVE LIST ---------------- */
 
 function renderMoves(){
 
@@ -1114,19 +1452,22 @@ results.forEach((m,i)=>{
 
 const btn=document.createElement("button");
 
-btn.className="move";
+const category=m.classification.toLowerCase();
 
-if(i===cursor-1)btn.classList.add("current");
+btn.className="move "+category;
 
-if(["Blunder","Mistake"].includes(m.classification))
+if(i===cursor-1)
+btn.classList.add("current");
+
+if(["Blunder","Mistake","Miss","Inaccuracy"].includes(m.classification))
 btn.classList.add("bad");
 
-if(["Best","Excellent"].includes(m.classification))
+if(["Best","Excellent","Good","Great","Brilliant"].includes(m.classification))
 btn.classList.add("good");
 
 btn.textContent=m.san;
 
-btn.title=m.classification;
+btn.title=m.classification+" · Loss: "+m.loss.toFixed(2);
 
 btn.onclick=()=>renderMove(i+1);
 
@@ -1135,6 +1476,8 @@ box.appendChild(btn);
 });
 
 }
+
+/* ---------------- EVALUATION GRAPH ---------------- */
 
 function renderGraph(){
 
@@ -1152,6 +1495,8 @@ pts.map(p=>p.x+","+p.y).join(" ")
 );
 
 }
+
+/* ---------------- BOARD ---------------- */
 
 function renderBoard(fen){
 
@@ -1205,7 +1550,6 @@ const q=document.createElement("span");
 q.className="coord";
 
 q.style.top="auto";
-
 q.style.bottom="2px";
 
 q.textContent="abcdefgh"[c];
@@ -1222,9 +1566,14 @@ el.appendChild(s);
 
 }
 
+/* ---------------- MOVE DETAIL ---------------- */
+
 function renderMove(ply){
 
-cursor=Math.max(0,Math.min(current.plies.length,ply));
+cursor=Math.max(
+0,
+Math.min(current.plies.length,ply)
+);
 
 const fen=cursor===0
 ?current.startFen
@@ -1238,22 +1587,25 @@ const evalv=m?m.afterScore:0;
 
 const pct=50+Math.max(-5,Math.min(5,evalv))*9;
 
-$("evalWhite").style.width=pct+"%";
+$("evalWhite").style.width=
+Math.max(0,Math.min(100,pct))+"%";
 
 $("evalScore").textContent=
 (evalv>0?"+":"")+evalv.toFixed(2);
 
 $("moveCount").textContent=
-cursor===0?"Start position":
-"Move "+Math.ceil(cursor/2);
+cursor===0
+?"Start position"
+:"Move "+Math.ceil(cursor/2);
 
 $("firstMove").disabled=cursor===0;
-
 $("prevMove").disabled=cursor===0;
 
-$("nextMove").disabled=cursor>=current.plies.length;
+$("nextMove").disabled=
+cursor>=current.plies.length;
 
-$("lastMove").disabled=cursor>=current.plies.length;
+$("lastMove").disabled=
+cursor>=current.plies.length;
 
 if(m){
 
@@ -1262,9 +1614,13 @@ m.number+". "+m.san;
 
 $("moveDetail").innerHTML="";
 
-const title=document.createElement("strong");
+const badge=document.createElement("div");
 
-title.textContent=m.classification;
+badge.className=
+"classification-badge badge-"+
+m.classification.toLowerCase();
+
+badge.textContent=m.classification;
 
 const played=document.createElement("p");
 
@@ -1278,7 +1634,20 @@ const loss=document.createElement("p");
 
 loss.textContent="Evaluation loss: "+m.loss.toFixed(2);
 
-$("moveDetail").append(title,played,best,loss);
+const evalText=document.createElement("p");
+
+evalText.textContent=
+"Position evaluation: "+
+(m.afterScore>0?"+":"")+
+m.afterScore.toFixed(2);
+
+$("moveDetail").append(
+badge,
+played,
+best,
+loss,
+evalText
+);
 
 }else{
 
@@ -1292,6 +1661,8 @@ renderMoves();
 
 }
 
+/* ---------------- NAVIGATION ---------------- */
+
 $("firstMove").onclick=()=>renderMove(0);
 
 $("prevMove").onclick=()=>renderMove(cursor-1);
@@ -1300,39 +1671,49 @@ $("nextMove").onclick=()=>renderMove(cursor+1);
 
 $("lastMove").onclick=()=>renderMove(current.plies.length);
 
+/* ---------------- LOAD GAME ---------------- */
+
 function startGame(game){
 
 latestAnalysis++;
 
-analysisBusy=false;
-
 current=game;
 
 results=[];
-
 cursor=0;
 
 $("reviewSection").classList.remove("hide");
 
-$("whiteName").textContent=game.headers.White||"White";
+$("whiteName").textContent=
+game.headers.White||"White";
 
-$("blackName").textContent=game.headers.Black||"Black";
+$("blackName").textContent=
+game.headers.Black||"Black";
 
-$("gameResult").textContent=game.headers.Result||"Game";
+$("gameResult").textContent=
+game.headers.Result||"Game";
 
-$("analysisProgress").textContent="";
+$("analysisProgress").textContent=
+analysisBusy
+?"Previous analysis is finishing..."
+:"";
+
+$("analysisProgress").classList.remove("error");
 
 $("whiteAccuracy").textContent="—";
-
 $("blackAccuracy").textContent="—";
 
 $("whiteErrors").textContent="—";
-
 $("blackErrors").textContent="—";
 
+renderSummary();
+renderMoves();
+renderGraph();
 renderMove(0);
 
-$("reviewSection").scrollIntoView({behavior:"smooth"});
+$("reviewSection").scrollIntoView({
+behavior:"smooth"
+});
 
 message("Game loaded successfully.");
 
