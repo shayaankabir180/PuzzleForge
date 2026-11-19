@@ -1,5 +1,7 @@
+
 /* PuzzleForge — Firebase shared cloud layer
-   Google Authentication + per-account Cloud Firestore data.
+   Google Authentication + account-isolated Cloud Firestore data.
+   Woodpecker statistics are synchronized per Google account.
 */
 (function () {
   "use strict";
@@ -17,13 +19,22 @@
   const PROFILE_KEY = "puzzleforge_profile_v1";
   const WOODPECKER_KEY = "puzzleforge_woodpecker_v1";
   const PROGRESS_OWNER_KEY = "puzzleforge_progress_owner_uid_v1";
+  const WOODPECKER_OWNER_KEY = "puzzleforge_woodpecker_owner_uid_v1";
+
+  const ACCOUNT_WOODPECKER_PREFIX =
+    "puzzleforge_woodpecker_account_";
+
+  const ACCOUNT_PROFILE_PREFIX =
+    "puzzleforge_profile_account_";
 
   if (!window.firebase) {
     console.error("PuzzleForge: Firebase SDK was not loaded.");
     return;
   }
 
-  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
 
   const auth = firebase.auth();
   const db = firebase.firestore();
@@ -31,20 +42,30 @@
 
   let currentUser = null;
   let previousUid = null;
+
   let syncTimer = null;
   let syncInProgress = false;
   let syncAgain = false;
   let progressLoadedUid = null;
+
   let authReadyResolve;
 
   const authReady = new Promise(resolve => {
     authReadyResolve = resolve;
   });
 
+  /* ---------------- LOCAL STORAGE ---------------- */
+
   function readLocal(key, fallback = {}) {
     try {
-      const value = JSON.parse(localStorage.getItem(key) || "null");
-      return value && typeof value === "object" ? value : fallback;
+      const value = JSON.parse(
+        localStorage.getItem(key) || "null"
+      );
+
+      return value && typeof value === "object"
+        ? value
+        : fallback;
+
     } catch (error) {
       return fallback;
     }
@@ -52,17 +73,48 @@
 
   function writeLocal(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(
+        key,
+        JSON.stringify(value)
+      );
+
+      return true;
+
     } catch (error) {
-      console.warn("PuzzleForge: local save failed", error);
+      console.warn(
+        "PuzzleForge: local save failed",
+        error
+      );
+
+      return false;
     }
   }
 
-  function unique(values) {
-    return [...new Set(
-      (Array.isArray(values) ? values : []).map(String)
-    )];
+  function removeLocal(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn(error);
+    }
   }
+
+  function accountWoodpeckerKey(uid) {
+    return ACCOUNT_WOODPECKER_PREFIX + uid;
+  }
+
+  function accountProfileKey(uid) {
+    return ACCOUNT_PROFILE_PREFIX + uid;
+  }
+
+  function unique(values) {
+    return [
+      ...new Set(
+        (Array.isArray(values) ? values : []).map(String)
+      )
+    ];
+  }
+
+  /* ---------------- PROGRESS ---------------- */
 
   function emptyProgress() {
     return {
@@ -78,9 +130,12 @@
   }
 
   function normalizeProgress(data) {
-    data = data && typeof data === "object" ? data : {};
+    data = data && typeof data === "object"
+      ? data
+      : {};
 
-    const daily = data.dailySolved &&
+    const daily =
+      data.dailySolved &&
       typeof data.dailySolved === "object" &&
       !Array.isArray(data.dailySolved)
         ? data.dailySolved
@@ -98,17 +153,57 @@
     return {
       solvedIds: unique(data.solvedIds),
       noHintIds: unique(data.noHintIds),
-      totalHints: Math.max(0, Number(data.totalHints) || 0),
-      totalAttempts: Math.max(0, Number(data.totalAttempts) || 0),
-      correctMoves: Math.max(0, Number(data.correctMoves) || 0),
+
+      totalHints: Math.max(
+        0,
+        Number(data.totalHints) || 0
+      ),
+
+      totalAttempts: Math.max(
+        0,
+        Number(data.totalAttempts) || 0
+      ),
+
+      correctMoves: Math.max(
+        0,
+        Number(data.correctMoves) || 0
+      ),
+
       solvedDates: unique(data.solvedDates),
+
       dailySolved: cleanDaily,
-      currentIndex: Math.max(0, Number(data.currentIndex) || 0)
+
+      currentIndex: Math.max(
+        0,
+        Number(data.currentIndex) || 0
+      )
+    };
+  }
+
+  /* ---------------- WOODPECKER DATA ---------------- */
+
+  function emptyWoodpecker() {
+    return {
+      history: [],
+
+      lifetimeStats: {
+        rounds: 0,
+        puzzles: 0,
+        bestMilliseconds: null,
+        fewestMistakes: null
+      },
+
+      puzzleRoundCounts: {}
     };
   }
 
   function historyKey(record) {
+    if (record.roundId) {
+      return String(record.roundId);
+    }
+
     return [
+      record.date || "",
       record.time || "",
       record.milliseconds || "",
       Array.isArray(record.puzzleIds)
@@ -117,49 +212,132 @@
     ].join("|");
   }
 
-  function mergeWoodpecker(local, cloud) {
-    local = local || {};
-    cloud = cloud || {};
+  function normalizeWoodpecker(data) {
+    data = data && typeof data === "object"
+      ? data
+      : {};
 
-    const records = new Map();
+    const history = Array.isArray(data.history)
+      ? data.history.filter(
+          item => item && typeof item === "object"
+        )
+      : [];
 
-    [...(cloud.history || []), ...(local.history || [])]
-      .forEach(record => {
-        if (record && typeof record === "object") {
-          records.set(historyKey(record), record);
-        }
-      });
+    const stats = data.lifetimeStats || {};
 
-    const history = [...records.values()]
-      .sort((a, b) =>
-        new Date(a.date || 0) - new Date(b.date || 0)
-      )
-      .slice(-20);
+    const counts =
+      data.puzzleRoundCounts &&
+      typeof data.puzzleRoundCounts === "object" &&
+      !Array.isArray(data.puzzleRoundCounts)
+        ? data.puzzleRoundCounts
+        : {};
 
-    const ls = local.lifetimeStats || {};
-    const cs = cloud.lifetimeStats || {};
+    const cleanCounts = {};
+
+    Object.keys(counts).forEach(id => {
+      cleanCounts[String(id)] = Math.max(
+        0,
+        Math.floor(Number(counts[id]) || 0)
+      );
+    });
 
     const validMin = values => {
       const nums = values
         .map(Number)
-        .filter(n => Number.isFinite(n) && n >= 0);
+        .filter(
+          n => Number.isFinite(n) && n >= 0
+        );
 
-      return nums.length ? Math.min(...nums) : null;
+      return nums.length
+        ? Math.min(...nums)
+        : null;
+    };
+
+    return {
+      history: history
+        .slice(-20),
+
+      lifetimeStats: {
+        rounds: Math.max(
+          0,
+          Number(stats.rounds) || 0
+        ),
+
+        puzzles: Math.max(
+          0,
+          Number(stats.puzzles) || 0
+        ),
+
+        bestMilliseconds: validMin([
+          stats.bestMilliseconds
+        ]),
+
+        fewestMistakes: validMin([
+          stats.fewestMistakes
+        ])
+      },
+
+      puzzleRoundCounts: cleanCounts
+    };
+  }
+
+  function mergeWoodpecker(local, cloud) {
+    local = normalizeWoodpecker(local);
+    cloud = normalizeWoodpecker(cloud);
+
+    const records = new Map();
+
+    [
+      ...cloud.history,
+      ...local.history
+    ].forEach(record => {
+      if (record && typeof record === "object") {
+        records.set(historyKey(record), record);
+      }
+    });
+
+    const history = [
+      ...records.values()
+    ]
+      .sort((a, b) => {
+        return (
+          new Date(a.date || 0).getTime() -
+          new Date(b.date || 0).getTime()
+        );
+      })
+      .slice(-20);
+
+    const ls = local.lifetimeStats;
+    const cs = cloud.lifetimeStats;
+
+    const validMin = values => {
+      const nums = values
+        .map(Number)
+        .filter(
+          n => Number.isFinite(n) && n >= 0
+        );
+
+      return nums.length
+        ? Math.min(...nums)
+        : null;
     };
 
     const lifetimeStats = {
       rounds: Math.max(
-        Number(ls.rounds) || 0,
-        Number(cs.rounds) || 0
+        ls.rounds,
+        cs.rounds
       ),
+
       puzzles: Math.max(
-        Number(ls.puzzles) || 0,
-        Number(cs.puzzles) || 0
+        ls.puzzles,
+        cs.puzzles
       ),
+
       bestMilliseconds: validMin([
         ls.bestMilliseconds,
         cs.bestMilliseconds
       ]),
+
       fewestMistakes: validMin([
         ls.fewestMistakes,
         cs.fewestMistakes
@@ -168,15 +346,15 @@
 
     const puzzleRoundCounts = {};
 
-    const allCounts = {
-      ...(cloud.puzzleRoundCounts || {}),
-      ...(local.puzzleRoundCounts || {})
-    };
+    const allIds = new Set([
+      ...Object.keys(local.puzzleRoundCounts),
+      ...Object.keys(cloud.puzzleRoundCounts)
+    ]);
 
-    Object.keys(allCounts).forEach(id => {
+    allIds.forEach(id => {
       puzzleRoundCounts[id] = Math.max(
-        Number((cloud.puzzleRoundCounts || {})[id]) || 0,
-        Number((local.puzzleRoundCounts || {})[id]) || 0
+        Number(local.puzzleRoundCounts[id]) || 0,
+        Number(cloud.puzzleRoundCounts[id]) || 0
       );
     });
 
@@ -187,12 +365,18 @@
     };
   }
 
+  /* ---------------- FIRESTORE REFERENCES ---------------- */
+
   async function userDoc() {
     if (!currentUser) {
-      throw new Error("Please sign in with Google first.");
+      throw new Error(
+        "Please sign in with Google first."
+      );
     }
 
-    return db.collection("users").doc(currentUser.uid);
+    return db
+      .collection("users")
+      .doc(currentUser.uid);
   }
 
   async function readCloudData(collectionName) {
@@ -203,7 +387,9 @@
       .doc(collectionName)
       .get();
 
-    return snapshot.exists ? (snapshot.data() || {}) : {};
+    return snapshot.exists
+      ? snapshot.data() || {}
+      : {};
   }
 
   async function writeCloudData(collectionName, data) {
@@ -215,15 +401,12 @@
       .set(data);
   }
 
-  /*
-   * Account-safe progress loading:
-   * Existing cloud data is authoritative.
-   * Guest data can be imported for a new account.
-   * Another account's local data is never imported.
-   */
+  /* ---------------- PROGRESS CLOUD SYNC ---------------- */
 
   async function syncProgress() {
-    if (!currentUser) return emptyProgress();
+    if (!currentUser) {
+      return emptyProgress();
+    }
 
     const uid = currentUser.uid;
 
@@ -238,19 +421,25 @@
       let progress;
 
       if (snapshot.exists) {
-        progress = normalizeProgress(snapshot.data());
+        progress = normalizeProgress(
+          snapshot.data()
+        );
+
       } else {
         const cachedOwner = localStorage.getItem(
           PROGRESS_OWNER_KEY
         );
 
-        const localBelongsToAnotherAccount =
+        const belongsToAnotherAccount =
           cachedOwner && cachedOwner !== uid;
 
-        progress = localBelongsToAnotherAccount
+        progress = belongsToAnotherAccount
           ? emptyProgress()
           : normalizeProgress(
-              readLocal(PROGRESS_KEY, emptyProgress())
+              readLocal(
+                PROGRESS_KEY,
+                emptyProgress()
+              )
             );
 
         await ref
@@ -261,7 +450,10 @@
 
       writeLocal(PROGRESS_KEY, progress);
 
-      localStorage.setItem(PROGRESS_OWNER_KEY, uid);
+      localStorage.setItem(
+        PROGRESS_OWNER_KEY,
+        uid
+      );
 
       progressLoadedUid = uid;
 
@@ -277,34 +469,145 @@
     return progress;
   }
 
+  /* ---------------- WOODPECKER CLOUD SYNC ---------------- */
+
   async function syncWoodpecker() {
-    const local = readLocal(WOODPECKER_KEY);
-    const cloud = await readCloudData("woodpecker");
+    if (!currentUser) {
+      return emptyWoodpecker();
+    }
 
-    const merged = mergeWoodpecker(local, cloud);
+    const uid = currentUser.uid;
 
-    writeLocal(WOODPECKER_KEY, merged);
+    const owner = localStorage.getItem(
+      WOODPECKER_OWNER_KEY
+    );
 
-    await writeCloudData("woodpecker", merged);
+    const accountCache = readLocal(
+      accountWoodpeckerKey(uid),
+      emptyWoodpecker()
+    );
+
+    let local;
+
+    if (owner === uid) {
+      // Local data belongs to the currently signed-in account.
+      local = readLocal(
+        WOODPECKER_KEY,
+        accountCache
+      );
+
+    } else if (!owner) {
+      // First account sign-in: guest data may be imported.
+      const guestData = readLocal(
+        WOODPECKER_KEY,
+        emptyWoodpecker()
+      );
+
+      local = mergeWoodpecker(
+        guestData,
+        accountCache
+      );
+
+    } else {
+      // Another Gmail previously used this browser.
+      // Never import that account's global cache.
+      local = accountCache;
+    }
+
+    const cloud = await readCloudData(
+      "woodpecker"
+    );
+
+    const merged = mergeWoodpecker(
+      local,
+      cloud
+    );
+
+    // Maintain a separate local backup for each Gmail.
+    writeLocal(
+      accountWoodpeckerKey(uid),
+      merged
+    );
+
+    // Keep compatibility with the existing Woodpecker HTML.
+    writeLocal(
+      WOODPECKER_KEY,
+      merged
+    );
+
+    localStorage.setItem(
+      WOODPECKER_OWNER_KEY,
+      uid
+    );
+
+    await writeCloudData(
+      "woodpecker",
+      merged
+    );
 
     return merged;
   }
 
+  /* ---------------- PROFILE CLOUD SYNC ---------------- */
+
   async function syncProfile() {
-    const local = readLocal(PROFILE_KEY);
+    if (!currentUser) return {};
+
+    const uid = currentUser.uid;
+
+    const accountCache = readLocal(
+      accountProfileKey(uid),
+      {}
+    );
+
+    const owner = localStorage.getItem(
+      "puzzleforge_profile_owner_uid_v1"
+    );
+
+    let local;
+
+    if (owner === uid) {
+      local = readLocal(
+        PROFILE_KEY,
+        accountCache
+      );
+
+    } else {
+      local = accountCache;
+    }
+
     const cloud = await readCloudData("profile");
 
     const merged = {
+      ...local,
       ...cloud,
       ...local
     };
 
-    writeLocal(PROFILE_KEY, merged);
+    writeLocal(
+      accountProfileKey(uid),
+      merged
+    );
 
-    await writeCloudData("profile", merged);
+    writeLocal(
+      PROFILE_KEY,
+      merged
+    );
+
+    localStorage.setItem(
+      "puzzleforge_profile_owner_uid_v1",
+      uid
+    );
+
+    await writeCloudData(
+      "profile",
+      merged
+    );
 
     return merged;
   }
+
+  /* ---------------- MAIN SYNC ---------------- */
 
   async function syncNow() {
     if (!currentUser) return false;
@@ -329,18 +632,26 @@
       } while (syncAgain);
 
       window.dispatchEvent(
-        new CustomEvent("puzzleforge:cloud-synced")
+        new CustomEvent(
+          "puzzleforge:cloud-synced"
+        )
       );
 
       return true;
 
     } catch (error) {
-      console.error("PuzzleForge cloud sync failed:", error);
+      console.error(
+        "PuzzleForge cloud sync failed:",
+        error
+      );
 
       window.dispatchEvent(
-        new CustomEvent("puzzleforge:sync-error", {
-          detail: error
-        })
+        new CustomEvent(
+          "puzzleforge:sync-error",
+          {
+            detail: error
+          }
+        )
       );
 
       return false;
@@ -360,6 +671,8 @@
     }, delay);
   }
 
+  /* ---------------- PROGRESS API ---------------- */
+
   async function getProgress() {
     await authReady;
 
@@ -371,7 +684,10 @@
     }
 
     return normalizeProgress(
-      readLocal(PROGRESS_KEY, emptyProgress())
+      readLocal(
+        PROGRESS_KEY,
+        emptyProgress()
+      )
     );
   }
 
@@ -384,20 +700,29 @@
       await authReady;
 
       if (currentUser) {
-        if (progressLoadedUid !== currentUser.uid) {
+        if (
+          progressLoadedUid !== currentUser.uid
+        ) {
           await syncProgress();
         }
 
-        await writeCloudData("progress", clean);
+        await writeCloudData(
+          "progress",
+          clean
+        );
       }
     }
 
     return clean;
   }
 
+  /* ---------------- GOOGLE AUTHENTICATION ---------------- */
+
   async function signIn() {
     try {
-      const result = await auth.signInWithPopup(googleProvider);
+      const result = await auth.signInWithPopup(
+        googleProvider
+      );
 
       return result.user;
 
@@ -409,9 +734,13 @@
         throw error;
       }
 
-      if (error.code === "auth/unauthorized-domain") {
+      if (
+        error.code === "auth/unauthorized-domain"
+      ) {
         throw new Error(
-          "This website domain is not authorized. Add your GitHub Pages domain in Firebase Authentication settings."
+          "This website domain is not authorized. " +
+          "Add your GitHub Pages domain in Firebase " +
+          "Authentication settings."
         );
       }
 
@@ -422,6 +751,8 @@
   async function signOut() {
     await auth.signOut();
   }
+
+  /* ---------------- COMMUNITY PUZZLES ---------------- */
 
   async function getPublicPuzzles() {
     const snapshot = await db
@@ -440,7 +771,9 @@
       fen: String(input.fen || "").trim(),
 
       moves: Array.isArray(input.moves)
-        ? input.moves.map(m => String(m).trim())
+        ? input.moves.map(
+            m => String(m).trim()
+          )
         : String(input.moves || "")
             .trim()
             .split(/\s+/)
@@ -455,7 +788,9 @@
             .map(x => x.trim())
             .filter(Boolean),
 
-      gameUrl: String(input.gameUrl || "").trim()
+      gameUrl: String(
+        input.gameUrl || ""
+      ).trim()
     };
 
     if (!puzzle.fen) {
@@ -463,7 +798,9 @@
     }
 
     if (puzzle.moves.length < 2) {
-      throw new Error("At least two UCI moves are required.");
+      throw new Error(
+        "At least two UCI moves are required."
+      );
     }
 
     return puzzle;
@@ -479,13 +816,21 @@
     }
 
     const puzzle = cleanPuzzle(input);
-    const doc = db.collection("puzzles").doc();
+
+    const doc = db
+      .collection("puzzles")
+      .doc();
 
     await doc.set({
       ...puzzle,
+
       ownerId: currentUser.uid,
-      ownerName: currentUser.displayName || "",
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+
+      ownerName:
+        currentUser.displayName || "",
+
+      createdAt:
+        firebase.firestore.FieldValue.serverTimestamp()
     });
 
     return {
@@ -511,7 +856,9 @@
       throw new Error("Puzzle not found.");
     }
 
-    if (snap.data().ownerId !== currentUser.uid) {
+    if (
+      snap.data().ownerId !== currentUser.uid
+    ) {
       throw new Error(
         "You can only delete puzzles you uploaded."
       );
@@ -520,8 +867,12 @@
     await ref.delete();
   }
 
+  /* ---------------- SOLVED PUZZLES ---------------- */
+
   function solvedPuzzleDocumentId(puzzleId) {
-    return encodeURIComponent(String(puzzleId));
+    return encodeURIComponent(
+      String(puzzleId)
+    );
   }
 
   async function getSolvedPuzzleIds() {
@@ -535,7 +886,10 @@
 
     return snapshot.docs.map(doc => {
       const data = doc.data() || {};
-      return String(data.puzzleId || doc.id);
+
+      return String(
+        data.puzzleId || doc.id
+      );
     });
   }
 
@@ -558,7 +912,9 @@
 
     const docRef = ref
       .collection("solvedPuzzles")
-      .doc(solvedPuzzleDocumentId(originalId));
+      .doc(
+        solvedPuzzleDocumentId(originalId)
+      );
 
     const existing = await docRef.get();
 
@@ -568,47 +924,75 @@
 
     await docRef.set({
       puzzleId: originalId,
-      solvedAt: firebase.firestore.FieldValue.serverTimestamp()
+
+      solvedAt:
+        firebase.firestore.FieldValue.serverTimestamp()
     });
 
     return true;
   }
 
+  /* ---------------- AUTH STATE ---------------- */
+
   auth.onAuthStateChanged(async user => {
     const oldUid = previousUid;
+    const newUid = user ? user.uid : null;
+
+    // Preserve the previous account's local backup
+    // before another account becomes active.
+    if (oldUid && oldUid !== newUid) {
+      writeLocal(
+        accountWoodpeckerKey(oldUid),
+        readLocal(
+          WOODPECKER_KEY,
+          emptyWoodpecker()
+        )
+      );
+
+      writeLocal(
+        accountProfileKey(oldUid),
+        readLocal(PROFILE_KEY, {})
+      );
+
+      removeLocal(WOODPECKER_KEY);
+      removeLocal(WOODPECKER_OWNER_KEY);
+
+      removeLocal(PROFILE_KEY);
+      removeLocal(
+        "puzzleforge_profile_owner_uid_v1"
+      );
+
+      removeLocal(PROGRESS_KEY);
+      removeLocal(PROGRESS_OWNER_KEY);
+    }
 
     currentUser = user || null;
     progressLoadedUid = null;
 
-    if (!currentUser && oldUid) {
-      try {
-        localStorage.removeItem(PROGRESS_KEY);
-        localStorage.removeItem(PROGRESS_OWNER_KEY);
-      } catch (error) {
-        console.warn(
-          "Could not clear signed-out progress cache:",
-          error
-        );
-      }
-    }
-
     if (currentUser) {
       previousUid = currentUser.uid;
+
       await syncNow();
+
     } else {
       previousUid = null;
     }
 
     window.dispatchEvent(
-      new CustomEvent("puzzleforge:auth", {
-        detail: {
-          user: currentUser
+      new CustomEvent(
+        "puzzleforge:auth",
+        {
+          detail: {
+            user: currentUser
+          }
         }
-      })
+      )
     );
 
     authReadyResolve(currentUser);
   });
+
+  /* ---------------- PUBLIC API ---------------- */
 
   window.PF = {
     auth,
