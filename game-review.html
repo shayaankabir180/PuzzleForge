@@ -85,19 +85,19 @@ opacity:.9;
 pointer-events:none;
 }
 
-/* Rank numbers: upper-right corner */
+/* Rank numbers: upper-left corner */
 .coord.rank{
-right:3px;
+left:3px;
 top:3px;
-left:auto;
+right:auto;
 bottom:auto;
 }
 
-/* File letters: lower-left corner */
+/* File letters: lower-right corner */
 .coord.file{
-left:3px;
+right:3px;
 bottom:3px;
-right:auto;
+left:auto;
 top:auto;
 }
 
@@ -700,15 +700,15 @@ badge.title=m.classification;
 s.appendChild(badge)
 }
 
-/* Rank notation: upper-right corner */
-if(c===7){
+/* Rank notation: left side */
+if(c===0){
 const q=document.createElement("span");
 q.className="coord rank";
 q.textContent=8-r;
 s.appendChild(q)
 }
 
-/* File notation: lower-left corner */
+/* File notation: lower-right corner */
 if(r===7){
 const q=document.createElement("span");
 q.className="coord file";
