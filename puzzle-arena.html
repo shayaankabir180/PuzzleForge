@@ -820,6 +820,7 @@ async function loadPuzzles(){
 
     puzzles = basePuzzles.map(normalizePuzzle).filter(Boolean);
 
+    // Load public community puzzles
     if(window.PF && typeof PF.getPublicPuzzles==="function"){
       try{
         const result = await PF.getPublicPuzzles();
@@ -843,29 +844,124 @@ async function loadPuzzles(){
       }
     }
 
+    // Get requested puzzle ID from URL
+    const requestedId = new URLSearchParams(window.location.search).get("id");
+
+    let requestedPuzzleIndex = -1;
+
+    if(requestedId){
+      requestedPuzzleIndex = puzzles.findIndex(
+        puzzle => String(puzzle.id) === String(requestedId)
+      );
+
+      // Try fetching the requested puzzle directly
+      if(
+        requestedPuzzleIndex < 0 &&
+        window.PF &&
+        typeof PF.getPublicPuzzle === "function"
+      ){
+        try{
+          const rawPuzzle = await PF.getPublicPuzzle(requestedId);
+          const requestedPuzzle = normalizePuzzle(rawPuzzle);
+
+          if(requestedPuzzle){
+            const existingIndex = puzzles.findIndex(
+              p => String(p.id) === String(requestedPuzzle.id)
+            );
+
+            if(existingIndex >= 0){
+              requestedPuzzleIndex = existingIndex;
+            }else{
+              puzzles.push(requestedPuzzle);
+              requestedPuzzleIndex = puzzles.length - 1;
+            }
+          }
+        }catch(error){
+          console.warn("Could not load requested community puzzle:",error);
+        }
+      }
+    }
+
     if(!puzzles.length){
       throw new Error("No valid puzzles were found.");
     }
 
-    currentIndex = Math.min(currentIndex,puzzles.length-1);
-
     updateStats();
 
-    activePuzzles = getFilteredPuzzles();
+    // Open the exact puzzle requested by the Library
+    if(requestedId){
 
-    if(!activePuzzles.length){
-      applyRatingFilter();
+      if(requestedPuzzleIndex >= 0){
+
+        const requestedPuzzle = puzzles[requestedPuzzleIndex];
+        const filter = document.getElementById("ratingFilter");
+
+        // Ensure the rating filter does not hide this puzzle
+        if(filter && filter.value !== "all"){
+          const range = filter.value.split("-").map(Number);
+          const rating = Number(requestedPuzzle.rating);
+
+          if(
+            !Number.isFinite(rating) ||
+            rating < range[0] ||
+            rating > range[1]
+          ){
+            filter.value = "all";
+          }
+        }
+
+        activePuzzles = getFilteredPuzzles();
+
+        const activeIndex = activePuzzles.findIndex(
+          p => String(p.id) === String(requestedId)
+        );
+
+        if(activeIndex >= 0){
+          startPuzzle(activeIndex);
+        }else{
+          setMessage("The requested puzzle could not be opened.","wrong");
+        }
+
+      }else{
+
+        // Requested puzzle was not found
+        currentIndex = 0;
+        activePuzzles = getFilteredPuzzles();
+
+        if(activePuzzles.length){
+          startPuzzle(0);
+        }
+
+        setMessage(
+          "This community puzzle could not be found. It may have been deleted or is unavailable.",
+          "wrong"
+        );
+      }
+
     }else{
-      const savedPuzzle = puzzles[currentIndex];
 
-      const restoredIndex = savedPuzzle
-        ? activePuzzles.findIndex(p=>String(p.id)===String(savedPuzzle.id))
-        : -1;
+      // Normal startup: restore previous progress
+      currentIndex = Math.min(currentIndex,puzzles.length-1);
 
-      startPuzzle(restoredIndex>=0 ? restoredIndex : 0);
+      activePuzzles = getFilteredPuzzles();
+
+      if(!activePuzzles.length){
+        applyRatingFilter();
+      }else{
+        const savedPuzzle = puzzles[currentIndex];
+
+        const restoredIndex = savedPuzzle
+          ? activePuzzles.findIndex(
+              p => String(p.id) === String(savedPuzzle.id)
+            )
+          : -1;
+
+        startPuzzle(restoredIndex >= 0 ? restoredIndex : 0);
+      }
     }
 
     startStockfish();
+
   }catch(error){
     console.error(error);
 
@@ -1199,7 +1295,7 @@ function canInteract(){
 function tryMove(from,to){
 
   if(viewingHistory){
-    setMessage("Return to the latest move before playing.");
+    setMessage("Return to the latest position before playing.");
     return false;
   }
 
