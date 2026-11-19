@@ -62,29 +62,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .progress-fill{height:100%;width:0%;background:#b6a05a;transition:width .3s}
 .themes{color:#aab4c3;font-size:12px;line-height:1.6;margin-top:12px}
 .note{color:#929baa;font-size:12px;line-height:1.5;margin-top:18px}
-
-.move-navigation{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px;
-  margin-top:14px;
-  padding:10px;
-  background:#222936;
-  border-radius:9px;
-}
-.move-navigation button{
-  min-width:42px;
-  padding:10px 12px;
-  font-size:17px;
-}
-.move-counter{
-  color:#d7bd70;
-  font-size:13px;
-  font-weight:bold;
-  min-width:65px;
-  text-align:center;
-}
+.move-navigation{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;padding:10px;background:#222936;border-radius:9px}
+.move-navigation button{min-width:42px;padding:10px 12px;font-size:17px}
+.move-counter{color:#d7bd70;font-size:13px;font-weight:bold;min-width:65px;text-align:center}
 
 @media(max-width:720px){
 .layout{grid-template-columns:1fr}
@@ -256,8 +236,6 @@ let dailySolved = {};
 
 let wrongMoveTimer = null;
 let wrongMovePreviousLastMove = null;
-
-/* ---------------- MOVE NAVIGATION ---------------- */
 
 let moveHistory = [];
 let historyIndex = 0;
@@ -494,7 +472,7 @@ function startStockfish(){
       engineReady = false;
       engineStarting = false;
       engineFailed = true;
-      console.error("Stockfish worker failed to load. Check engine JS/WASM paths.",event);
+      console.error("Stockfish worker failed to load.",event);
     };
 
     stockfishWorker.postMessage("uci");
@@ -610,7 +588,7 @@ function pieceName(piece){
 function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
   if(!beforeResult || !afterResult ||
      beforeResult.score===null || afterResult.score===null){
-    return "Stockfish could not complete the evaluation. Please check that both engine files are installed correctly.";
+    return "Stockfish could not complete the evaluation.";
   }
 
   const before = moverColor==="w"
@@ -630,11 +608,11 @@ function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
     if(reply.checkmate){
       reason = "This move delivers checkmate, so the position is immediately lost.";
     }else if(reply.check){
-      reason = "This move gives check, forcing your king to respond instead of allowing you to carry out your plan.";
+      reason = "This move gives check, forcing your king to respond.";
     }else if(reply.captured){
       reason = "This move captures your "+pieceName(reply.captured)+", winning material.";
     }else{
-      reason = "This move is the engine's strongest reply. It creates a concrete threat and leaves you at a disadvantage.";
+      reason = "This move is the engine's strongest reply.";
     }
   }
 
@@ -648,7 +626,7 @@ function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
   else if(loss>=2) evaluationText = "The evaluation drops by about "+loss.toFixed(1)+" pawns, a major disadvantage.";
   else if(loss>=0.8) evaluationText = "The evaluation drops by about "+loss.toFixed(1)+" pawns, giving the opponent a clear advantage.";
   else if(loss>=0.3) evaluationText = "The evaluation drops by about "+loss.toFixed(1)+" pawns, leaving you in a less comfortable position.";
-  else evaluationText = "The engine finds only a small evaluation change, but this move misses the puzzle's best continuation.";
+  else evaluationText = "The engine finds only a small evaluation change.";
 
   return moveText+reason+" "+evaluationText;
 }
@@ -684,7 +662,7 @@ async function explainWrongMove(beforeFen,afterFen,moverColor){
     }
 
     if(!engineReady){
-      throw new Error("Stockfish did not become ready. Check JS and WASM files.");
+      throw new Error("Engine did not become ready.");
     }
 
     const before = await analyzeFen(beforeFen,15);
@@ -707,7 +685,7 @@ async function explainWrongMove(beforeFen,afterFen,moverColor){
 
     if(wrongMovePending){
       setMessage(
-        "❌ WRONG MOVE! Stockfish could not start. Check that stockfish-19-lite-single.js and stockfish-19-lite-single.wasm are present in the engine folder with the correct filenames.",
+        "❌ WRONG MOVE! Stockfish could not start. Check the engine JS and WASM files.",
         "wrong"
       );
 
@@ -751,15 +729,8 @@ function applyRatingFilter(){
     legalTargets = [];
     hintSquare = null;
 
-    if(wrongMoveTimer){
-      clearTimeout(wrongMoveTimer);
-      wrongMoveTimer = null;
-    }
-
-    if(opponentMoveTimer){
-      clearTimeout(opponentMoveTimer);
-      opponentMoveTimer = null;
-    }
+    if(wrongMoveTimer) clearTimeout(wrongMoveTimer);
+    if(opponentMoveTimer) clearTimeout(opponentMoveTimer);
 
     moveHistory = [];
     historyIndex = 0;
@@ -793,14 +764,30 @@ function applyRatingFilter(){
 
 /* ---------------- LOAD PUZZLES ---------------- */
 
-function normalizePuzzle(puzzle){
+/*
+  IMPORTANT:
+
+  Built-in puzzles:
+  Lichess-style format. moves[0] is the opponent's setup move.
+
+  Community puzzles:
+  FEN is already the starting position for the solver.
+  moves[0] is the solver's FIRST move.
+
+  This distinction fixes the White/Black side problem.
+*/
+
+function normalizePuzzle(puzzle,isCommunity=false){
   if(!puzzle || !puzzle.fen || !Array.isArray(puzzle.moves)) return null;
 
   return {
     ...puzzle,
     id: String(puzzle.id || ("community-"+puzzle.fen+"-"+puzzle.moves.join("-"))),
     rating: Number(puzzle.rating) || 1500,
-    themes: Array.isArray(puzzle.themes) ? puzzle.themes : []
+    themes: Array.isArray(puzzle.themes) ? puzzle.themes : [],
+
+    // Community uploads start directly from the supplied FEN.
+    _solverStartsFromFen: isCommunity
   };
 }
 
@@ -818,9 +805,10 @@ async function loadPuzzles(){
       throw new Error("Puzzle database is empty.");
     }
 
-    puzzles = basePuzzles.map(normalizePuzzle).filter(Boolean);
+    // Built-in puzzles retain their original format.
+    puzzles = basePuzzles.map(p=>normalizePuzzle(p,false)).filter(Boolean);
 
-    // Load public community puzzles
+    // Load public community puzzles.
     if(window.PF && typeof PF.getPublicPuzzles==="function"){
       try{
         const result = await PF.getPublicPuzzles();
@@ -832,7 +820,8 @@ async function loadPuzzles(){
         const existingIds = new Set(puzzles.map(p=>String(p.id)));
 
         publicPuzzles.forEach(raw=>{
-          const puzzle = normalizePuzzle(raw);
+          // Community uploads use the supplied FEN as the actual start.
+          const puzzle = normalizePuzzle(raw,true);
 
           if(puzzle && !existingIds.has(String(puzzle.id))){
             puzzles.push(puzzle);
@@ -844,7 +833,6 @@ async function loadPuzzles(){
       }
     }
 
-    // Get requested puzzle ID from URL
     const requestedId = new URLSearchParams(window.location.search).get("id");
 
     let requestedPuzzleIndex = -1;
@@ -854,7 +842,7 @@ async function loadPuzzles(){
         puzzle => String(puzzle.id) === String(requestedId)
       );
 
-      // Try fetching the requested puzzle directly
+      // Fetch requested community puzzle directly if necessary.
       if(
         requestedPuzzleIndex < 0 &&
         window.PF &&
@@ -862,7 +850,9 @@ async function loadPuzzles(){
       ){
         try{
           const rawPuzzle = await PF.getPublicPuzzle(requestedId);
-          const requestedPuzzle = normalizePuzzle(rawPuzzle);
+
+          // Directly requested records are community uploads.
+          const requestedPuzzle = normalizePuzzle(rawPuzzle,true);
 
           if(requestedPuzzle){
             const existingIndex = puzzles.findIndex(
@@ -888,7 +878,6 @@ async function loadPuzzles(){
 
     updateStats();
 
-    // Open the exact puzzle requested by the Library
     if(requestedId){
 
       if(requestedPuzzleIndex >= 0){
@@ -896,7 +885,6 @@ async function loadPuzzles(){
         const requestedPuzzle = puzzles[requestedPuzzleIndex];
         const filter = document.getElementById("ratingFilter");
 
-        // Ensure the rating filter does not hide this puzzle
         if(filter && filter.value !== "all"){
           const range = filter.value.split("-").map(Number);
           const rating = Number(requestedPuzzle.rating);
@@ -924,7 +912,6 @@ async function loadPuzzles(){
 
       }else{
 
-        // Requested puzzle was not found
         currentIndex = 0;
         activePuzzles = getFilteredPuzzles();
 
@@ -940,7 +927,6 @@ async function loadPuzzles(){
 
     }else{
 
-      // Normal startup: restore previous progress
       currentIndex = Math.min(currentIndex,puzzles.length-1);
 
       activePuzzles = getFilteredPuzzles();
@@ -1023,23 +1009,59 @@ function startPuzzle(index){
 
     const moves = currentPuzzle.moves;
 
-    if(!moves || moves.length<2){
+    if(!moves || !moves.length){
       throw new Error("Invalid puzzle moves.");
     }
 
-    const setupMove = applyUci(moves[0]);
+    if(currentPuzzle._solverStartsFromFen){
 
-    if(!setupMove){
-      throw new Error("Could not apply setup move.");
+      /*
+        COMMUNITY PUZZLE:
+
+        Do NOT automatically play moves[0].
+
+        The supplied FEN already represents the position
+        where the solver must play.
+
+        Example:
+        FEN side-to-move = White
+        moves[0] = White's first solution move
+
+        Therefore the solver starts as White.
+      */
+
+      puzzleMoveIndex = 0;
+
+      flipped = game.turn()==="b";
+
+    }else{
+
+      /*
+        BUILT-IN PUZZLE:
+
+        Original Lichess-style format.
+        moves[0] is the opponent's setup move.
+      */
+
+      if(moves.length<2){
+        throw new Error("Built-in puzzle needs at least two moves.");
+      }
+
+      const setupMove = applyUci(moves[0]);
+
+      if(!setupMove){
+        throw new Error("Could not apply setup move.");
+      }
+
+      lastMove = {
+        from: setupMove.from,
+        to: setupMove.to
+      };
+
+      puzzleMoveIndex = 1;
+
+      flipped = game.turn()==="b";
     }
-
-    lastMove = {
-      from: setupMove.from,
-      to: setupMove.to
-    };
-
-    puzzleMoveIndex = 1;
-    flipped = game.turn()==="b";
 
     document.getElementById("puzzleNumber").textContent =
       "Puzzle "+(activeIndex+1)+" / "+activePuzzles.length;
@@ -1054,7 +1076,9 @@ function startPuzzle(index){
 
     updateSolvedBadge();
 
-    setMessage("Find the best move!");
+    setMessage(
+      "Your turn ("+(game.turn()==="w"?"White":"Black")+"). Find the best move!"
+    );
 
     saveMovePosition(null);
 
@@ -1062,12 +1086,13 @@ function startPuzzle(index){
     saveProgress();
 
   }catch(error){
+    console.error("Puzzle initialization error:",error);
     setMessage("Puzzle error: "+error.message,"wrong");
     document.getElementById("gameStatus").textContent = "Puzzle Error";
   }
 }
 
-/* ---------------- MOVE NAVIGATION SYSTEM ---------------- */
+/* ---------------- MOVE NAVIGATION ---------------- */
 
 function saveMovePosition(move){
 
@@ -1115,7 +1140,6 @@ function updateMoveNavigation(){
 function goToMove(index){
 
   if(index<0 || index>=moveHistory.length) return;
-
   if(opponentThinking || wrongMovePending) return;
 
   const position = moveHistory[index];
@@ -1137,7 +1161,6 @@ function goToMove(index){
   if(!loaded) return;
 
   historyIndex=index;
-
   puzzleMoveIndex=position.puzzleMoveIndex;
 
   lastMove=position.lastMove
@@ -1159,34 +1182,22 @@ function goToMove(index){
   renderBoard();
 
   if(viewingHistory){
-
-    setMessage(
-      "Viewing previous position. Return to the latest move to continue."
-    );
-
+    setMessage("Viewing previous position. Return to the latest move to continue.");
   }else if(puzzleSolved){
-
     setMessage("Puzzle solved!","success");
-
   }else{
-
     setMessage("Your turn. Find the next correct move!");
-
   }
 
   updateMoveNavigation();
 }
 
 function goToPreviousMove(){
-  if(historyIndex>0){
-    goToMove(historyIndex-1);
-  }
+  if(historyIndex>0) goToMove(historyIndex-1);
 }
 
 function goToNextMove(){
-  if(historyIndex<moveHistory.length-1){
-    goToMove(historyIndex+1);
-  }
+  if(historyIndex<moveHistory.length-1) goToMove(historyIndex+1);
 }
 
 function goToFirstMove(){
@@ -1241,12 +1252,8 @@ function renderBoard(){
         const pieceCode = piece.type.toUpperCase();
 
         const pieceNames = {
-          k:"King",
-          q:"Queen",
-          r:"Rook",
-          b:"Bishop",
-          n:"Knight",
-          p:"Pawn"
+          k:"King",q:"Queen",r:"Rook",
+          b:"Bishop",n:"Knight",p:"Pawn"
         };
 
         const el = document.createElement("img");
@@ -1302,12 +1309,14 @@ function tryMove(from,to){
   if(from===to) return false;
 
   const expected = currentPuzzle.moves[puzzleMoveIndex];
+
   if(!expected) return false;
 
   const expectedFrom = expected.substring(0,2);
   const expectedTo = expected.substring(2,4);
 
   if(from===expectedFrom && to===expectedTo){
+
     const move = game.move({
       from,
       to,
@@ -1318,8 +1327,8 @@ function tryMove(from,to){
       recordMoveAttempt(true);
 
       lastMove = {
-        from: move.from,
-        to: move.to
+        from:move.from,
+        to:move.to
       };
 
       selected = null;
@@ -1329,7 +1338,6 @@ function tryMove(from,to){
       puzzleMoveIndex++;
 
       saveMovePosition(move);
-
       renderBoard();
 
       if(puzzleMoveIndex>=currentPuzzle.moves.length){
@@ -1337,6 +1345,7 @@ function tryMove(from,to){
       }else{
         opponentThinking = true;
         updateMoveNavigation();
+
         setMessage("Correct move! Opponent is thinking...");
 
         opponentMoveTimer = setTimeout(()=>{
@@ -1368,8 +1377,8 @@ function tryMove(from,to){
       : null;
 
     lastMove = {
-      from: wrongMove.from,
-      to: wrongMove.to
+      from:wrongMove.from,
+      to:wrongMove.to
     };
 
     selected = null;
@@ -1438,58 +1447,71 @@ const DRAG_THRESHOLD = 4;
 
 function boardGeometry(){
   const rect = boardElement.getBoundingClientRect();
+
   return {
-    left: rect.left + boardElement.clientLeft,
-    top: rect.top + boardElement.clientTop,
-    size: boardElement.clientWidth / 8
+    left:rect.left+boardElement.clientLeft,
+    top:rect.top+boardElement.clientTop,
+    size:boardElement.clientWidth/8
   };
 }
 
 function squareIndexAt(x,y,geo){
   const g = geo || boardGeometry();
+
   const c = Math.floor((x-g.left)/g.size);
   const r = Math.floor((y-g.top)/g.size);
+
   if(c<0 || c>7 || r<0 || r>7) return -1;
+
   return r*8+c;
 }
 
 function squareNameFromIndex(i){
   const r = Math.floor(i/8);
   const c = i%8;
+
   const row = flipped ? 7-r : r;
   const col = flipped ? 7-c : c;
+
   return "abcdefgh"[col]+(8-row);
 }
 
 function setDragOver(el){
   if(!drag || drag.overEl===el) return;
+
   if(drag.overEl) drag.overEl.classList.remove("drag-over");
+
   drag.overEl = el;
+
   if(el) el.classList.add("drag-over");
 }
 
 function paintGhost(){
-  dragRaf = 0;
+  dragRaf=0;
+
   if(!drag || !drag.ghost) return;
+
   drag.ghost.style.transform =
     "translate3d("+(drag.x-drag.half)+"px,"+(drag.y-drag.half)+"px,0) scale(1.08)";
 }
 
 function scheduleGhost(x,y){
   if(!drag) return;
-  drag.x = x;
-  drag.y = y;
-  if(!dragRaf) dragRaf = requestAnimationFrame(paintGhost);
+
+  drag.x=x;
+  drag.y=y;
+
+  if(!dragRaf) dragRaf=requestAnimationFrame(paintGhost);
 }
 
 function endDragTracking(){
   if(!drag) return null;
 
-  const state = drag;
+  const state=drag;
 
   if(dragRaf){
     cancelAnimationFrame(dragRaf);
-    dragRaf = 0;
+    dragRaf=0;
   }
 
   if(state.overEl) state.overEl.classList.remove("drag-over");
@@ -1498,44 +1520,51 @@ function endDragTracking(){
     boardElement.releasePointerCapture(state.pointerId);
   }catch(e){}
 
-  document.body.style.cursor = "";
-  drag = null;
+  document.body.style.cursor="";
+  drag=null;
 
   return state;
 }
 
 function cancelDrag(){
-  const state = endDragTracking();
+  const state=endDragTracking();
+
   if(!state) return;
 
   if(state.ghost) state.ghost.remove();
 
   if(state.originImg){
     state.originImg.classList.remove("drag-origin");
-    state.originImg.style.opacity = "";
+    state.originImg.style.opacity="";
   }
 }
 
 function snapBack(state){
-  const ghost = state.ghost;
+  const ghost=state.ghost;
+
   if(!ghost) return;
 
-  const originEl = boardElement.querySelector('.square[data-square="'+state.from+'"]');
+  const originEl=boardElement.querySelector(
+    '.square[data-square="'+state.from+'"]'
+  );
 
   if(!originEl){
     ghost.remove();
+
     if(state.originImg){
       state.originImg.classList.remove("drag-origin");
-      state.originImg.style.opacity = "";
+      state.originImg.style.opacity="";
     }
+
     return;
   }
 
-  const rect = originEl.getBoundingClientRect();
-  const cx = rect.left+rect.width/2;
-  const cy = rect.top+rect.height/2;
+  const rect=originEl.getBoundingClientRect();
+  const cx=rect.left+rect.width/2;
+  const cy=rect.top+rect.height/2;
 
   ghost.classList.add("snap");
+
   ghost.style.transform =
     "translate3d("+(cx-state.half)+"px,"+(cy-state.half)+"px,0) scale(1)";
 
@@ -1544,7 +1573,7 @@ function snapBack(state){
 
     if(state.originImg){
       state.originImg.classList.remove("drag-origin");
-      state.originImg.style.opacity = "";
+      state.originImg.style.opacity="";
     }
   },190);
 }
@@ -1553,32 +1582,33 @@ boardElement.addEventListener("pointerdown",event=>{
   if(event.pointerType==="mouse" && event.button!==0) return;
   if(!canInteract()) return;
 
-  const squareEl = event.target.closest(".square");
+  const squareEl=event.target.closest(".square");
+
   if(!squareEl) return;
 
-  const square = squareEl.dataset.square;
-  const piece = game.get(square);
+  const square=squareEl.dataset.square;
+  const piece=game.get(square);
 
   if(wrongMoveNoticeActive){
-    wrongMoveNoticeActive = false;
+    wrongMoveNoticeActive=false;
     setMessage("Try another move!");
   }
 
-  drag = {
-    pointerId: event.pointerId,
-    from: square,
-    startX: event.clientX,
-    startY: event.clientY,
-    x: event.clientX,
-    y: event.clientY,
-    dragging: false,
-    hasPiece: !!piece,
-    movable: !!(piece && piece.color===game.turn()),
-    ghost: null,
-    originImg: null,
-    overEl: null,
-    half: 0,
-    geo: null
+  drag={
+    pointerId:event.pointerId,
+    from:square,
+    startX:event.clientX,
+    startY:event.clientY,
+    x:event.clientX,
+    y:event.clientY,
+    dragging:false,
+    hasPiece:!!piece,
+    movable:!!(piece && piece.color===game.turn()),
+    ghost:null,
+    originImg:null,
+    overEl:null,
+    half:0,
+    geo:null
   };
 
   try{
@@ -1598,54 +1628,61 @@ boardElement.addEventListener("pointermove",event=>{
   if(!drag.dragging){
     if(!drag.hasPiece) return;
 
-    const dx = event.clientX-drag.startX;
-    const dy = event.clientY-drag.startY;
+    const dx=event.clientX-drag.startX;
+    const dy=event.clientY-drag.startY;
 
     if(Math.hypot(dx,dy)<DRAG_THRESHOLD) return;
 
-    const originSquare = boardElement.querySelector('.square[data-square="'+drag.from+'"]');
-    const originImg = originSquare ? originSquare.querySelector(".piece-image") : null;
+    const originSquare=boardElement.querySelector(
+      '.square[data-square="'+drag.from+'"]'
+    );
+
+    const originImg=originSquare
+      ? originSquare.querySelector(".piece-image")
+      : null;
 
     if(!originImg){
-      drag = null;
+      drag=null;
       return;
     }
 
-    drag.geo = boardGeometry();
+    drag.geo=boardGeometry();
 
-    const size = drag.geo.size*0.98;
+    const size=drag.geo.size*0.98;
 
-    const ghost = originImg.cloneNode(true);
-    ghost.className = "drag-ghost";
-    ghost.style.width = size+"px";
-    ghost.style.height = size+"px";
+    const ghost=originImg.cloneNode(true);
+
+    ghost.className="drag-ghost";
+    ghost.style.width=size+"px";
+    ghost.style.height=size+"px";
+
     document.body.appendChild(ghost);
 
     originImg.classList.add("drag-origin");
-    originImg.style.opacity = "0.25";
+    originImg.style.opacity="0.25";
 
-    document.body.style.cursor = "grabbing";
+    document.body.style.cursor="grabbing";
 
-    drag.half = size/2;
-    drag.ghost = ghost;
-    drag.originImg = originImg;
-    drag.dragging = true;
+    drag.half=size/2;
+    drag.ghost=ghost;
+    drag.originImg=originImg;
+    drag.dragging=true;
   }
 
   event.preventDefault();
 
   scheduleGhost(event.clientX,event.clientY);
 
-  let overEl = null;
+  let overEl=null;
 
   if(drag.movable){
-    const idx = squareIndexAt(event.clientX,event.clientY,drag.geo);
+    const idx=squareIndexAt(event.clientX,event.clientY,drag.geo);
 
     if(idx>=0){
-      const name = squareNameFromIndex(idx);
+      const name=squareNameFromIndex(idx);
 
       if(name!==drag.from && legalTargets.includes(name)){
-        overEl = boardElement.children[idx] || null;
+        overEl=boardElement.children[idx] || null;
       }
     }
   }
@@ -1656,19 +1693,23 @@ boardElement.addEventListener("pointermove",event=>{
 boardElement.addEventListener("pointerup",event=>{
   if(!drag || event.pointerId!==drag.pointerId) return;
 
-  const geo = drag.geo;
-  const state = endDragTracking();
+  const geo=drag.geo;
+  const state=endDragTracking();
 
-  const idx = squareIndexAt(event.clientX,event.clientY,geo);
-  const target = idx>=0 ? squareNameFromIndex(idx) : null;
+  const idx=squareIndexAt(event.clientX,event.clientY,geo);
+  const target=idx>=0 ? squareNameFromIndex(idx) : null;
 
   if(state.dragging){
-    if(state.movable && target && target!==state.from && legalTargets.includes(target)){
+
+    if(state.movable && target &&
+       target!==state.from &&
+       legalTargets.includes(target)){
+
       state.ghost.remove();
 
       if(!tryMove(state.from,target)){
         state.originImg.classList.remove("drag-origin");
-        state.originImg.style.opacity = "";
+        state.originImg.style.opacity="";
         renderBoard();
       }
 
@@ -1679,7 +1720,7 @@ boardElement.addEventListener("pointerup",event=>{
 
     if(target && target!==state.from){
       if(!state.movable){
-        setMessage("That's your opponent's piece. You can drag it, but you can only move your own pieces.");
+        setMessage("That's your opponent's piece. You can only move your own pieces.");
       }else{
         setMessage("Illegal move. Drop the piece on a highlighted square.","wrong");
       }
@@ -1697,7 +1738,7 @@ boardElement.addEventListener("pointerup",event=>{
 boardElement.addEventListener("pointercancel",event=>{
   if(!drag || event.pointerId!==drag.pointerId) return;
 
-  const state = endDragTracking();
+  const state=endDragTracking();
 
   if(state && state.dragging) snapBack(state);
 });
@@ -1709,11 +1750,11 @@ boardElement.addEventListener("dragstart",event=>event.preventDefault());
 function playOpponentMove(){
   if(puzzleSolved || !currentPuzzle) return;
 
-  const move = applyUci(
+  const move=applyUci(
     currentPuzzle.moves[puzzleMoveIndex]
   );
 
-  opponentThinking = false;
+  opponentThinking=false;
 
   if(!move){
     updateMoveNavigation();
@@ -1721,15 +1762,14 @@ function playOpponentMove(){
     return;
   }
 
-  lastMove = {
-    from: move.from,
-    to: move.to
+  lastMove={
+    from:move.from,
+    to:move.to
   };
 
   puzzleMoveIndex++;
 
   saveMovePosition(move);
-
   renderBoard();
 
   if(puzzleMoveIndex>=currentPuzzle.moves.length){
@@ -1742,17 +1782,17 @@ function playOpponentMove(){
 async function finishPuzzle(){
   if(puzzleSolved) return;
 
-  puzzleSolved = true;
-  opponentThinking = false;
-  wrongMovePending = false;
+  puzzleSolved=true;
+  opponentThinking=false;
+  wrongMovePending=false;
 
   if(moveHistory.length && historyIndex===moveHistory.length-1){
-    moveHistory[historyIndex].solved = true;
+    moveHistory[historyIndex].solved=true;
   }
 
   updateMoveNavigation();
 
-  const id = String(currentPuzzle.id);
+  const id=String(currentPuzzle.id);
 
   if(!solvedIds.includes(id)){
     solvedIds.push(id);
@@ -1762,27 +1802,27 @@ async function finishPuzzle(){
     }
   }
 
-  const today = localDateKey();
+  const today=localDateKey();
 
   if(!solvedDates.includes(today)){
     solvedDates.push(today);
   }
 
-  dailySolved[today] = (Number(dailySolved[today])||0)+1;
+  dailySolved[today]=(Number(dailySolved[today])||0)+1;
 
   saveProgress();
 
   if(window.PF && PF.user &&
      typeof PF.markPuzzleSolved==="function"){
 
-    const uid = PF.user.uid;
+    const uid=PF.user.uid;
 
     try{
       await PF.markPuzzleSolved(id);
 
       if(PF.user && PF.user.uid===uid){
         cloudSolvedIds.add(id);
-        solvedIdsUserUid = uid;
+        solvedIdsUserUid=uid;
       }
     }catch(error){
       console.error("Could not permanently save solved puzzle:",error);
@@ -1796,7 +1836,7 @@ async function finishPuzzle(){
 
   updateSolvedBadge();
 
-  document.getElementById("gameStatus").textContent = "Puzzle Solved!";
+  document.getElementById("gameStatus").textContent="Puzzle Solved!";
 
   setMessage(
     hintCount===0
@@ -1813,7 +1853,7 @@ async function finishPuzzle(){
 function getHint(){
   if(!canInteract()) return;
 
-  const expected = currentPuzzle.moves[puzzleMoveIndex];
+  const expected=currentPuzzle.moves[puzzleMoveIndex];
 
   if(!expected) return;
 
@@ -1823,14 +1863,14 @@ function getHint(){
     totalHints++;
   }
 
-  const from = expected.substring(0,2);
-  const to = expected.substring(2,4);
+  const from=expected.substring(0,2);
+  const to=expected.substring(2,4);
 
   if(hintLevel===1){
-    hintSquare = from;
+    hintSquare=from;
     setMessage("Hint 1: Look at the highlighted starting square.");
   }else{
-    hintSquare = to;
+    hintSquare=to;
     setMessage("Hint 2: Move the piece to the highlighted square.");
   }
 
@@ -1842,35 +1882,31 @@ function getHint(){
 function previousPuzzle(){
   if(!activePuzzles.length) return;
 
-  const activeIndex = activePuzzles.findIndex(
+  const activeIndex=activePuzzles.findIndex(
     puzzle=>currentPuzzle && String(puzzle.id)===String(currentPuzzle.id)
   );
 
-  const index = activeIndex<0 ? 0 : activeIndex;
+  const index=activeIndex<0 ? 0 : activeIndex;
 
-  startPuzzle(
-    (index-1+activePuzzles.length)%activePuzzles.length
-  );
+  startPuzzle((index-1+activePuzzles.length)%activePuzzles.length);
 }
 
 function nextPuzzle(){
   if(!activePuzzles.length) return;
 
-  const activeIndex = activePuzzles.findIndex(
+  const activeIndex=activePuzzles.findIndex(
     puzzle=>currentPuzzle && String(puzzle.id)===String(currentPuzzle.id)
   );
 
-  const index = activeIndex<0 ? 0 : activeIndex;
+  const index=activeIndex<0 ? 0 : activeIndex;
 
-  startPuzzle(
-    (index+1)%activePuzzles.length
-  );
+  startPuzzle((index+1)%activePuzzles.length);
 }
 
 function restartPuzzle(){
   if(!activePuzzles.length) return;
 
-  const activeIndex = activePuzzles.findIndex(
+  const activeIndex=activePuzzles.findIndex(
     puzzle=>currentPuzzle && String(puzzle.id)===String(currentPuzzle.id)
   );
 
@@ -1879,7 +1915,7 @@ function restartPuzzle(){
 
 function flipBoard(){
   cancelDrag();
-  flipped = !flipped;
+  flipped=!flipped;
   renderBoard();
 }
 
@@ -1888,11 +1924,11 @@ function updateInfo(){
     game.turn()==="w" ? "White" : "Black";
 
   if(puzzleSolved){
-    document.getElementById("gameStatus").textContent = "Puzzle Solved!";
+    document.getElementById("gameStatus").textContent="Puzzle Solved!";
   }else if(opponentThinking){
-    document.getElementById("gameStatus").textContent = "Opponent Moving";
+    document.getElementById("gameStatus").textContent="Opponent Moving";
   }else if(viewingHistory){
-    document.getElementById("gameStatus").textContent = "Move Preview";
+    document.getElementById("gameStatus").textContent="Move Preview";
   }else{
     document.getElementById("gameStatus").textContent =
       game.in_check() ? "Check" : "In Progress";
