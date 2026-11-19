@@ -93,6 +93,12 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 .detail-text p{margin:8px 0}
 .detail-text strong{color:white}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}
+.rating-note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+.advanced-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.advanced-item{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px}
+.advanced-item small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}
+.advanced-item strong{font-size:18px}
+.confidence{display:inline-block;border:1px solid var(--line);border-radius:5px;padding:3px 7px;font-size:10px;color:var(--muted);margin-top:5px}
 
 @media(max-width:800px){
 .grid{grid-template-columns:1fr}
@@ -140,7 +146,6 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 [Black "Opponent"]
 
 1. e4 e5 2. Nf3 Nc6 ...'></textarea>
-
 <label>Or upload PGN</label>
 <input type="file" id="pgnFile" accept=".pgn,text/plain">
 <button class="btn primary" id="loadPgn">Load PGN</button>
@@ -173,16 +178,16 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 
 <section id="reviewSection" class="hide">
 
-<!-- PERFORMANCE SUMMARY -->
-
 <div class="stats">
 <div class="stat">
 <small>Estimated Rating · White</small>
 <strong id="whiteRating">—</strong>
+<span class="confidence" id="whiteConfidence">Awaiting analysis</span>
 </div>
 <div class="stat">
 <small>Estimated Rating · Black</small>
 <strong id="blackRating">—</strong>
+<span class="confidence" id="blackConfidence">Awaiting analysis</span>
 </div>
 <div class="stat">
 <small>Overall Accuracy · White</small>
@@ -202,30 +207,26 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 </div>
 </div>
 
-<p class="section-note">
-Estimated rating is a PuzzleForge performance estimate, not an official chess rating.
-Accuracy and centipawn loss are calculated using our own analysis model.
+<p class="rating-note">
+PuzzleForge Estimated Rating is an experimental, single-game performance estimate.
+It is not a FIDE or Chess.com rating. A reliable rating requires calibration against
+a large collection of games with known player ratings.
 </p>
-
-<!-- PHASE ACCURACY -->
 
 <div class="category-panel">
 <h2>Phase-wise Accuracy</h2>
 <p class="section-note">Accuracy is calculated separately for each game phase.</p>
-
 <div class="category-grid">
 <div class="category-stat">
 <small>Opening</small>
 <strong id="openingAccuracy">—</strong>
 <div class="phase-bar"><div class="phase-fill" id="openingBar" style="width:0%"></div></div>
 </div>
-
 <div class="category-stat">
 <small>Middlegame</small>
 <strong id="middlegameAccuracy">—</strong>
 <div class="phase-bar"><div class="phase-fill" id="middlegameBar" style="width:0%"></div></div>
 </div>
-
 <div class="category-stat">
 <small>Endgame</small>
 <strong id="endgameAccuracy">—</strong>
@@ -234,48 +235,27 @@ Accuracy and centipawn loss are calculated using our own analysis model.
 </div>
 </div>
 
-<!-- MOVE CLASSIFICATION -->
-
 <div class="category-panel">
 <h2>Move Classification</h2>
 <p class="section-note">PuzzleForge uses four primary move categories.</p>
-
 <div class="category-grid">
-<div class="category-stat">
-<small>Engine Move</small>
-<strong id="countEngine">0</strong>
-</div>
-<div class="category-stat">
-<small>Good Move</small>
-<strong id="countGood">0</strong>
-</div>
-<div class="category-stat">
-<small>Bad Move</small>
-<strong id="countBad">0</strong>
-</div>
-<div class="category-stat">
-<small>Chaos · Blunder</small>
-<strong id="countChaos">0</strong>
+<div class="category-stat"><small>Engine Move</small><strong id="countEngine">0</strong></div>
+<div class="category-stat"><small>Good Move</small><strong id="countGood">0</strong></div>
+<div class="category-stat"><small>Bad Move</small><strong id="countBad">0</strong></div>
+<div class="category-stat"><small>Chaos</small><strong id="countChaos">0</strong></div>
 </div>
 </div>
-</div>
-
-<!-- BOARD AND REVIEW -->
 
 <div class="grid">
 
 <div class="board-area panel">
-
 <div class="row">
 <strong id="whiteName">White</strong>
 <span id="gameResult">Game</span>
 <strong id="blackName">Black</strong>
 </div>
 
-<div class="evalbar">
-<div class="evalwhite" id="evalWhite"></div>
-</div>
-
+<div class="evalbar"><div class="evalwhite" id="evalWhite"></div></div>
 <div class="evaltext">
 <span id="evalScore">0.0</span>
 <span id="moveCount">Start</span>
@@ -289,7 +269,6 @@ Accuracy and centipawn loss are calculated using our own analysis model.
 
 <div class="board-wrap">
 <div class="board" id="board"></div>
-
 <svg class="arrow-layer" id="arrowLayer" viewBox="0 0 800 800">
 <defs>
 <marker id="arrowHead" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
@@ -308,39 +287,64 @@ marker-end="url(#arrowHead)" opacity="0"/>
 <button class="btn" id="nextMove">▶</button>
 <button class="btn" id="lastMove">▶|</button>
 </div>
-
 <p class="section-note">Green arrow indicates Stockfish's best move when it differs from your played move.</p>
-
 </div>
 
 <div>
 
+<!-- MOVE EXPLANATION FIRST -->
+<div class="panel">
+<h2 id="reviewHeading">Move Review</h2>
+<div id="moveDetail" class="analysis-box">
+Select a move and analyse the game.
+</div>
+<div class="moves" id="moveList"></div>
+</div>
+
+<!-- GRAPH BELOW MOVE EXPLANATION -->
 <div class="panel">
 <h2>Evaluation Graph</h2>
-
 <svg class="graph" id="evalGraph" viewBox="0 0 600 140" preserveAspectRatio="none">
 <path d="M0 70H600" stroke="#596273" stroke-dasharray="5 5"/>
 <polyline id="graphLine" points="" fill="none" stroke="#cbb36a" stroke-width="3"/>
 <line id="graphCursor" x1="0" y1="0" x2="0" y2="140" stroke="#fff" stroke-width="1" opacity=".5"/>
 </svg>
-
 <p class="section-note">Evaluation is shown from White's perspective. Positive values favour White.</p>
 </div>
 
+</div>
+</div>
+
 <div class="panel">
-<h2 id="reviewHeading">Move Review</h2>
-
-<div id="moveDetail" class="analysis-box">
-Select a move and analyse the game.
+<h2>Advanced Statistics</h2>
+<p class="section-note">Additional engine-based measurements.</p>
+<div class="advanced-grid">
+<div class="advanced-item">
+<small>Average CPL · White</small>
+<strong id="advancedWhiteCPL">—</strong>
 </div>
-
-<div class="moves" id="moveList"></div>
+<div class="advanced-item">
+<small>Average CPL · Black</small>
+<strong id="advancedBlackCPL">—</strong>
 </div>
-
+<div class="advanced-item">
+<small>Average Expected Points Loss · White</small>
+<strong id="whiteEPL">—</strong>
+</div>
+<div class="advanced-item">
+<small>Average Expected Points Loss · Black</small>
+<strong id="blackEPL">—</strong>
+</div>
+<div class="advanced-item">
+<small>White Moves Analysed</small>
+<strong id="whiteMovesAnalysed">0</strong>
+</div>
+<div class="advanced-item">
+<small>Black Moves Analysed</small>
+<strong id="blackMovesAnalysed">0</strong>
 </div>
 </div>
-
-<!-- ENGINE SETTINGS -->
+</div>
 
 <div class="panel">
 <div class="row">
@@ -350,14 +354,12 @@ Select a move and analyse the game.
 </div>
 <button class="btn primary" id="analyseBtn">Analyse Game</button>
 </div>
-
 <label>Analysis depth</label>
 <select id="depthSelect">
 <option value="10">Depth 10</option>
 <option value="12" selected>Depth 12</option>
 <option value="15">Depth 15</option>
 </select>
-
 <div id="analysisProgress" class="status"></div>
 </div>
 
@@ -370,7 +372,6 @@ Select a move and analyse the game.
 
 const $=id=>document.getElementById(id);
 const START="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
 const MATERIAL={p:1,n:3,b:3,r:5,q:9,k:0};
 
 const ICONS={
@@ -397,11 +398,10 @@ let readyPromise=null;
 let activeResolve=null;
 let activeScore=null;
 let activeBestMove=null;
+let activeDepth=-1;
+let activeTurn="w";
 let analysisBusy=false;
 let latestAnalysis=0;
-
-
-/* BASIC HELPERS */
 
 function clamp(x,min,max){
 return Math.max(min,Math.min(max,x));
@@ -420,16 +420,13 @@ function sigmoid(x){
 return 1/(1+Math.exp(-x));
 }
 
-
 /* EXPECTED POINTS MODEL */
 
 function winProbability(cp){
-
 cp=clamp(Number(cp)||0,-10000,10000);
 
 const abs=Math.abs(cp);
 let draw=0.50*Math.exp(-abs/350);
-
 draw=clamp(Math.max(0.015,draw),0,0.50);
 
 const decisive=1-draw;
@@ -439,15 +436,12 @@ let whiteWin=decisive*share;
 let blackWin=decisive*(1-share);
 
 const total=whiteWin+draw+blackWin;
-
 whiteWin/=total;
 draw/=total;
 blackWin/=total;
 
-return {
-whiteWin,
-draw,
-blackWin,
+return{
+whiteWin,draw,blackWin,
 whiteEP:whiteWin+draw/2,
 blackEP:blackWin+draw/2
 };
@@ -459,55 +453,38 @@ return color==="w"?p.whiteEP:p.blackEP;
 }
 
 function moverWDL(cp,color){
-
 const p=winProbability(cp);
-
 return color==="w"
 ?{win:p.whiteWin,draw:p.draw,loss:p.blackWin}
 :{win:p.blackWin,draw:p.draw,loss:p.whiteWin};
 }
 
-
 /* IMPORT TABS */
 
 document.querySelectorAll(".tab").forEach(btn=>{
-
 btn.onclick=()=>{
-
 document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
 btn.classList.add("active");
-
 ["pgn","lichess","chesscom"].forEach(n=>{
 $(n+"Tab").classList.toggle("hide",n!==btn.dataset.tab);
 });
-
 };
-
 });
 
-
-/* PGN IMPORT */
+/* PGN */
 
 function splitPgn(text){
-
 const clean=text.trim();
 if(!clean)return [];
-
-return clean.split(/(?=^\s*\[Event\s)/m)
-.map(x=>x.trim())
-.filter(Boolean);
+return clean.split(/(?=^\s*\[Event\s)/m).map(x=>x.trim()).filter(Boolean);
 }
 
 function parseGame(pgn){
-
 const g=new Chess();
-
-if(!g.load_pgn(pgn,{sloppy:true}))
-throw Error("Invalid PGN.");
+if(!g.load_pgn(pgn,{sloppy:true}))throw Error("Invalid PGN.");
 
 const headers=g.header();
 const sans=g.history();
-
 if(!sans.length)throw Error("No moves found.");
 
 const startFen=headers.FEN||START;
@@ -515,10 +492,8 @@ const replay=new Chess(startFen);
 const plies=[];
 
 sans.forEach((san,i)=>{
-
 const before=replay.fen();
 const m=replay.move(san,{sloppy:true});
-
 if(!m)throw Error("Invalid move: "+san);
 
 plies.push({
@@ -529,170 +504,121 @@ before,
 after:replay.fen(),
 number:Math.ceil((i+1)/2)
 });
-
 });
 
-return {headers,sans,plies,startFen};
+return{headers,sans,plies,startFen};
 }
 
 function loadText(text){
-
 try{
-
 games=splitPgn(text).map(p=>({game:parseGame(p)}));
-
 if(!games.length)throw Error("No game found.");
 
 $("gamePicker").innerHTML="";
-
 games.forEach((g,i)=>{
-
 const o=document.createElement("option");
 o.value=i;
-
-o.textContent=
-(g.game.headers.White||"White")+" vs "+
+o.textContent=(g.game.headers.White||"White")+" vs "+
 (g.game.headers.Black||"Black")+" · "+
 (g.game.headers.Date||"Unknown date");
-
 $("gamePicker").appendChild(o);
-
 });
 
 $("gamePickerWrap").classList.remove("hide");
 message(games.length+" game(s) loaded.");
-
 }catch(e){
 message(e.message,true);
 }
-
 }
 
 $("loadPgn").onclick=()=>loadText($("pgnInput").value);
 
 $("pgnFile").onchange=async e=>{
-
 const f=e.target.files[0];
 if(!f)return;
-
 try{
 $("pgnInput").value=await f.text();
 loadText($("pgnInput").value);
 }catch(err){
 message("Could not read PGN file.",true);
 }
-
 };
 
 $("useSelected").onclick=()=>{
-
 const g=games[Number($("gamePicker").value)];
-
 if(g)startGame(g.game);
-
 };
-
 
 /* LICHESS */
 
 async function fetchLichess(){
-
 const user=$("lichessUser").value.trim();
-
 if(!user)return message("Enter username.",true);
 
 message("Fetching games...");
 
 try{
-
 const r=await fetch(
 "https://lichess.org/api/games/user/"+
-encodeURIComponent(user)+
-"?max=15&moves=true",
+encodeURIComponent(user)+"?max=15&moves=true",
 {headers:{Accept:"application/x-chess-pgn"}}
 );
-
 if(!r.ok)throw Error("Lichess error: "+r.status);
-
 loadText(await r.text());
-
 }catch(e){
 message(e.message,true);
 }
-
 }
-
 $("fetchLichess").onclick=fetchLichess;
-
 
 /* CHESS.COM */
 
 async function fetchChesscom(){
-
 const user=$("chesscomUser").value.trim();
-
 if(!user)return message("Enter username.",true);
 
 message("Fetching Chess.com games...");
 
 try{
-
 const a=await fetch(
 "https://api.chess.com/pub/player/"+
 encodeURIComponent(user)+"/games/archives"
 );
-
 if(!a.ok)throw Error("Chess.com error: "+a.status);
 
 const data=await a.json();
 const urls=(data.archives||[]).slice(-3).reverse();
-
 if(!urls.length)throw Error("No public archives found.");
 
 const chunks=[];
-
 for(const url of urls){
-
 const r=await fetch(url+"/pgn");
-
 if(r.ok){
 const t=await r.text();
 if(t.trim())chunks.push(t);
 }
-
 }
-
 if(!chunks.length)throw Error("No PGN games available.");
-
 loadText(chunks.join("\n"));
-
 }catch(e){
 message(e.message,true);
 }
-
 }
-
 $("fetchChesscom").onclick=fetchChesscom;
 
-
-/* STOCKFISH WORKER */
+/* STOCKFISH */
 
 function ensureEngine(){
-
 if(readyPromise)return readyPromise;
 
 readyPromise=new Promise((resolve,reject)=>{
-
 let settled=false;
 let readyTimeout;
 
 function fail(error){
-
 if(settled)return;
-
 settled=true;
 clearTimeout(readyTimeout);
-
 readyPromise=null;
 activeResolve=null;
 
@@ -700,140 +626,99 @@ if(worker){
 worker.terminate();
 worker=null;
 }
-
 reject(error);
-
 }
 
 function ready(){
-
 if(settled)return;
-
 settled=true;
 clearTimeout(readyTimeout);
-
 $("engineStatus").textContent="Stockfish 19 Lite Ready";
-
 resolve();
-
 }
 
 try{
-
 worker=new Worker("engine/stockfish-19-lite-single.js");
-
 }catch(e){
-
 fail(Error("Could not create Stockfish worker: "+e.message));
 return;
-
 }
 
 readyTimeout=setTimeout(()=>{
-
 fail(Error("Stockfish startup timeout. Check engine file path and worker loading."));
-
 },45000);
 
 worker.onmessage=e=>{
-
-const s=typeof e.data==="string"
-?e.data
-:(e.data&&e.data.text)||"";
-
+const s=typeof e.data==="string"?e.data:(e.data&&e.data.text)||"";
 if(!s)return;
 
 if(s.includes("uciok")){
-
 worker.postMessage("setoption name Threads value 1");
 worker.postMessage("setoption name Hash value 32");
 worker.postMessage("isready");
-
 return;
-
 }
 
 if(s.includes("readyok")){
-
 ready();
 return;
-
 }
-
-/* SCORE */
 
 if(s.startsWith("info ")&&activeResolve){
+const depthMatch=s.match(/\bdepth\s+(\d+)/);
+const lineDepth=depthMatch?Number(depthMatch[1]):-1;
 
-const m=s.match(/\bscore (cp|mate) (-?\d+)/);
+const scoreMatch=s.match(/\bscore (cp|mate) (-?\d+)/);
 
-if(m){
+if(scoreMatch&&lineDepth>=activeDepth){
+activeDepth=lineDepth;
 
-const val=Number(m[2]);
-const turn=window.analysisTurn||"w";
+const value=Number(scoreMatch[2]);
+let score;
 
-if(m[1]==="mate"){
-
-const mateScore=10000-Math.min(999,Math.abs(val));
-
-activeScore=(turn==="w"?1:-1)*
-(val>=0?mateScore:-mateScore);
-
+if(scoreMatch[1]==="mate"){
+const mateMagnitude=10000-Math.min(999,Math.abs(value));
+score=(value>=0?mateMagnitude:-mateMagnitude);
 }else{
-
-activeScore=turn==="w"?val/100:-val/100;
-
+score=value/100;
 }
 
+/* UCI score is converted from side-to-move to White perspective. */
+activeScore=activeTurn==="w"?score:-score;
 }
 
-/* Keep the latest principal variation best move */
-const bm=s.match(/\bpv\s+([a-h][1-8][a-h][1-8][qrbn]?)/);
-
-if(bm)activeBestMove=bm[1];
-
+const pv=s.match(/\bpv\s+([a-h][1-8][a-h][1-8][qrbn]?)/);
+if(pv&&lineDepth>=activeDepth){
+activeBestMove=pv[1];
 }
-
-/* BESTMOVE */
+}
 
 if(s.startsWith("bestmove ")&&activeResolve){
-
 const done=activeResolve;
 activeResolve=null;
-
 done({
-score:activeScore,
-bestMove:s.split(/\s+/)[1]
+score:activeScore===null?0:activeScore,
+bestMove:s.split(/\s+/)[1]||"(none)"
 });
-
 }
-
 };
 
 worker.onerror=()=>{
-
 fail(Error("Stockfish worker error. Check engine file path."));
-
 };
 
 worker.onmessageerror=()=>{
-
 fail(Error("Invalid message from Stockfish worker."));
-
 };
 
 worker.postMessage("uci");
-
 });
 
 return readyPromise;
-
 }
 
-
 function analyzeFen(fen,depth){
-
 return new Promise((resolve,reject)=>{
-
 if(!worker){
 reject(Error("Stockfish worker is not running."));
 return;
@@ -841,71 +726,49 @@ return;
 
 activeScore=null;
 activeBestMove=null;
-
-window.analysisTurn=fen.split(" ")[1];
+activeDepth=-1;
+activeTurn=fen.split(" ")[1]||"w";
 
 let finished=false;
 
 const timeout=setTimeout(()=>{
-
 if(finished)return;
-
 finished=true;
-
 if(activeResolve===finish)activeResolve=null;
-
 reject(Error("Analysis timeout."));
-
 },60000);
 
 function finish(data){
-
 if(finished)return;
-
 finished=true;
 clearTimeout(timeout);
-
 resolve(data);
-
 }
 
 activeResolve=finish;
-
 worker.postMessage("position fen "+fen);
 worker.postMessage("go depth "+depth);
-
 });
-
 }
 
-
 function sanFromUci(fen,uci){
-
 try{
-
 if(!uci||uci==="(none)"||uci==="0000")return "—";
-
 const g=new Chess(fen);
-
 const m=g.move({
 from:uci.slice(0,2),
 to:uci.slice(2,4),
 promotion:uci[4]||"q"
 });
-
 return m?m.san:uci;
-
 }catch(e){
 return uci;
 }
-
 }
 
-
-/* GAME PHASE DETECTION */
+/* GAME PHASE */
 
 function getPhase(fen,moveNumber){
-
 const g=new Chess(fen);
 const board=g.board();
 
@@ -913,366 +776,271 @@ let queens=0;
 let material=0;
 
 board.forEach(rank=>{
-
 rank.forEach(p=>{
-
 if(!p||p.type==="k")return;
-
 material+=MATERIAL[p.type]||0;
-
 if(p.type==="q")queens++;
-
 });
-
 });
-
-/*
-Opening: first 10 full moves.
-Endgame: queens are gone and remaining non-king
-material is sufficiently low.
-Otherwise: Middlegame.
-*/
 
 if(moveNumber<=10)return "Opening";
-
 if(queens===0&&material<=13)return "Endgame";
-
 return "Middlegame";
-
 }
 
-
-/* MOVE CLASSIFICATION */
+/* CLASSIFICATION */
 
 function classifyMove(isBest,loss){
-
 if(isBest)return "Engine Move";
 
 /*
-Expected-points loss thresholds:
-
-0.00 - 0.04 : Good Move
-0.04 - 0.20 : Bad Move
-0.20+       : Chaos / Blunder
-
-These are PuzzleForge thresholds, not Chess.com thresholds.
+PuzzleForge experimental EP-loss thresholds.
+These are not Chess.com thresholds.
 */
-
-if(loss<=0.04)return "Good Move";
-
-if(loss<0.20)return "Bad Move";
-
+if(loss<=0.02)return "Good Move";
+if(loss<0.12)return "Bad Move";
 return "Chaos";
-
 }
 
+/* ACCURACY MODEL */
 
-/* ACCURACY */
+function moveAccuracy(loss){
+/*
+Per-move quality score.
+Expected-points loss is used instead of raw CPL alone.
+The nonlinear curve makes larger mistakes more costly.
+*/
+const l=clamp(loss,0,1);
+return 100*Math.exp(-3.0*l-1.5*l*l);
+}
 
 function calculateAccuracy(list){
-
 if(!list.length)return null;
-
-const avg=list.reduce((s,x)=>s+x.loss,0)/list.length;
-
-return clamp(100*Math.exp(-2.5*avg),0,100);
-
+const total=list.reduce((s,x)=>s+moveAccuracy(x.loss),0);
+return total/list.length;
 }
 
 function formatAccuracy(value){
-
 return value===null?"—":value.toFixed(1)+"%";
-
 }
 
-
-/* ESTIMATED RATING */
-
-function estimatedRating(list){
-
-const acc=calculateAccuracy(list);
-
-if(acc===null)return null;
-
-/*
-A heuristic performance estimate.
-It is not a calibrated FIDE/Chess.com rating.
-*/
-
-const rating=400+acc*20;
-
-return Math.round(clamp(rating,400,2400)/10)*10;
-
-}
-
-
-/* AVERAGE CENTIPAWN LOSS */
+/* PERFORMANCE ESTIMATE */
 
 function averageCPL(list){
-
 if(!list.length)return null;
-
 return list.reduce((s,x)=>s+x.cpl,0)/list.length;
-
 }
 
+function averageLoss(list){
+if(!list.length)return null;
+return list.reduce((s,x)=>s+x.loss,0)/list.length;
+}
 
-/* EXPLANATION ENGINE */
+function estimatePerformance(list){
+if(list.length<6){
+return{rating:null,confidence:"Insufficient moves"};
+}
+
+const accuracy=calculateAccuracy(list);
+const cpl=averageCPL(list);
+const avgLoss=averageLoss(list);
+
+/*
+This is a provisional performance index, not a calibrated rating.
+Combines accuracy, average CPL and expected-points loss.
+The estimate is intentionally broad and should not be treated
+as a replacement for an established rating system.
+*/
+const quality=
+0.55*(accuracy/100)+
+0.25*Math.exp(-cpl/90)+
+0.20*Math.exp(-avgLoss*5);
+
+const rating= Math.round(
+clamp(600+quality*1550,600,2150)/25
+)*25;
+
+let confidence="Low confidence";
+if(list.length>=30)confidence="Moderate confidence";
+if(list.length>=50)confidence="Better sample";
+
+return{rating,confidence};
+}
+
+/* EXPLANATION */
 
 function explainMove(m){
-
-const g=new Chess(m.before);
 const played=new Chess(m.before);
-
 const move=played.move({
 from:m.uci.slice(0,2),
 to:m.uci.slice(2,4),
 promotion:m.uci[4]||"q"
 });
 
-const best=m.bestMove;
-const loss=m.loss;
-const mover=m.color==="w"?"White":"Black";
-
 let text="";
 
 if(m.classification==="Engine Move"){
-
-text="You found Stockfish's top move. ";
-
+text="You played Stockfish's top-ranked move in the analysed position. ";
 }else if(m.classification==="Good Move"){
-
-text="Your move maintains the position well and stays close to the engine's preferred continuation. ";
-
+text="This move keeps the position close to the engine's preferred evaluation. ";
 }else if(m.classification==="Bad Move"){
-
-text="This move gives your opponent a meaningful improvement in the position. ";
-
+text="This move gives away a noticeable amount of expected points compared with the engine's preferred continuation. ";
 }else{
-
-text="This is a serious mistake. It significantly changes the expected outcome of the position. ";
-
+text="This move causes a major deterioration in the engine's evaluation and significantly changes the expected outcome. ";
 }
 
 if(move){
-
 if(move.captured){
-
-text+="The move captures a "+move.captured.toUpperCase()+". ";
-
+text+="It captures a "+move.captured.toUpperCase()+". ";
 }
-
-if(move.san.includes("+")){
-
-text+="It gives check. ";
-
-}
-
 if(move.san.includes("#")){
-
 text+="It delivers checkmate. ";
-
+}else if(move.san.includes("+")){
+text+="It gives check. ";
 }
-
 if(move.flags.includes("k")||move.flags.includes("q")){
-
-text+="You castle, improving king safety. ";
-
+text+="You castle, moving the king to safety. ";
 }
-
 if(move.promotion){
-
 text+="The pawn promotes to a "+move.promotion.toUpperCase()+". ";
-
+}
 }
 
+if(m.bestMove&&m.bestMove!=="—"&&m.bestMove!==m.san){
+text+="Stockfish's top choice was "+m.bestMove+". ";
 }
 
-if(best&&best!=="—"){
-
-text+="Stockfish preferred "+best+" instead of "+m.san+". ";
-
-if(best!==m.san){
-
-text+="The engine's alternative preserves a better position or avoids the problem created by your move. ";
-
+if(m.loss>0){
+text+="The estimated expected-points loss is "+(m.loss*100).toFixed(2)+" percentage points. ";
+}else{
+text+="The model detected no measurable expected-points loss. ";
 }
-
-}
-
-if(m.beforeScore!==undefined&&m.afterScore!==undefined){
 
 const delta=m.afterScore-m.beforeScore;
-
-if(Math.abs(delta)<0.15){
-
-text+="The overall evaluation remains relatively stable. ";
-
-}else if(delta>0){
-
-text+="The position became more favourable for White. ";
-
-}else{
-
-text+="The position became more favourable for Black. ";
-
+if(Math.abs(delta)>0.15){
+text+=delta>0
+?"The resulting position is more favourable for White. "
+:"The resulting position is more favourable for Black. ";
 }
 
-}
-
-if(loss>0){
-
-text+="Your expected-points loss is "+(loss*100).toFixed(2)+" percentage points. ";
-
-}else{
-
-text+="No measurable expected-points loss was detected by this model. ";
-
-}
-
-text+="Classification: "+m.classification+".";
-
+text+="This classification is based on the engine evaluation at the selected depth.";
 return text;
-
 }
-
 
 /* SUMMARY */
 
 function renderSummary(){
-
 const white=results.filter(x=>x.color==="w");
 const black=results.filter(x=>x.color==="b");
 
-$("whiteAccuracy").textContent=formatAccuracy(calculateAccuracy(white));
-$("blackAccuracy").textContent=formatAccuracy(calculateAccuracy(black));
+const wa=calculateAccuracy(white);
+const ba=calculateAccuracy(black);
+const wc=averageCPL(white);
+const bc=averageCPL(black);
 
-$("whiteCPL").textContent=
-averageCPL(white)===null?"—":averageCPL(white).toFixed(1);
+$("whiteAccuracy").textContent=formatAccuracy(wa);
+$("blackAccuracy").textContent=formatAccuracy(ba);
 
-$("blackCPL").textContent=
-averageCPL(black)===null?"—":averageCPL(black).toFixed(1);
+$("whiteCPL").textContent=wc===null?"—":wc.toFixed(1)+" cp";
+$("blackCPL").textContent=bc===null?"—":bc.toFixed(1)+" cp";
 
-$("whiteRating").textContent=
-estimatedRating(white)===null?"—":estimatedRating(white);
+const wr=estimatePerformance(white);
+const br=estimatePerformance(black);
 
-$("blackRating").textContent=
-estimatedRating(black)===null?"—":estimatedRating(black);
+$("whiteRating").textContent=wr.rating===null?"—":wr.rating;
+$("blackRating").textContent=br.rating===null?"—":br.rating;
 
-["Engine Move","Good Move","Bad Move","Chaos"].forEach(name=>{
+$("whiteConfidence").textContent=wr.confidence;
+$("blackConfidence").textContent=br.confidence;
 
-const id={
+const countIds={
 "Engine Move":"countEngine",
 "Good Move":"countGood",
 "Bad Move":"countBad",
 "Chaos":"countChaos"
-}[name];
+};
 
-$(id).textContent=
+Object.keys(countIds).forEach(name=>{
+$(countIds[name]).textContent=
 results.filter(x=>x.classification===name).length;
-
 });
 
 /* PHASE ACCURACY */
-
 const phases=["Opening","Middlegame","Endgame"];
-
-const ids={
-Opening:"opening",
-Middlegame:"middlegame",
-Endgame:"endgame"
-};
+const ids={Opening:"opening",Middlegame:"middlegame",Endgame:"endgame"};
 
 phases.forEach(phase=>{
-
 const list=results.filter(x=>x.phase===phase);
 const acc=calculateAccuracy(list);
 const key=ids[phase];
-
 $(key+"Accuracy").textContent=formatAccuracy(acc);
 $(key+"Bar").style.width=(acc===null?0:acc)+"%";
-
 });
 
-}
+/* ADVANCED */
+$("advancedWhiteCPL").textContent=wc===null?"—":wc.toFixed(1)+" cp";
+$("advancedBlackCPL").textContent=bc===null?"—":bc.toFixed(1)+" cp";
 
+const wl=averageLoss(white);
+const bl=averageLoss(black);
+
+$("whiteEPL").textContent=wl===null?"—":(wl*100).toFixed(2)+" pp";
+$("blackEPL").textContent=bl===null?"—":(bl*100).toFixed(2)+" pp";
+
+$("whiteMovesAnalysed").textContent=white.length;
+$("blackMovesAnalysed").textContent=black.length;
+}
 
 /* MOVE LIST */
 
 function renderMoves(){
-
 const box=$("moveList");
 box.innerHTML="";
 
 results.forEach((m,i)=>{
-
 const btn=document.createElement("button");
-
 btn.className="move "+cat(m.classification);
-
 if(i===cursor-1)btn.classList.add("current");
-
 btn.textContent=m.san;
 btn.title=m.classification+" · CPL: "+m.cpl.toFixed(1);
-
 btn.onclick=()=>renderMove(i+1);
-
 box.appendChild(btn);
-
 });
-
 }
 
-
-/* EVALUATION GRAPH */
+/* GRAPH */
 
 function renderGraph(){
-
 const line=[];
 const total=Math.max(1,results.length);
 
 results.forEach((m,i)=>{
-
 const x=(i+1)/total*600;
 const y=70-clamp(m.afterScore,-6,6)*10;
-
 line.push(x+","+y);
-
 });
 
 $("graphLine").setAttribute("points",line.join(" "));
 
 const cx=cursor===0?0:cursor/total*600;
-
 $("graphCursor").setAttribute("x1",cx);
 $("graphCursor").setAttribute("x2",cx);
-
 }
-
 
 /* BOARD */
 
 function squarePoint(square){
-
 const file=square.charCodeAt(0)-97;
 const rank=Number(square[1]);
-
-return {
-x:(file+0.5)*100,
-y:(8-rank+0.5)*100
-};
-
+return{x:(file+0.5)*100,y:(8-rank+0.5)*100};
 }
 
 function renderArrow(uci){
-
 const line=$("bestArrow");
 
 if(!uci||uci==="—"||uci==="(none)"||uci==="0000"){
-
 line.setAttribute("opacity","0");
 return;
-
 }
 
 const from=squarePoint(uci.slice(0,2));
@@ -1282,17 +1050,12 @@ line.setAttribute("x1",from.x);
 line.setAttribute("y1",from.y);
 line.setAttribute("x2",to.x);
 line.setAttribute("y2",to.y);
-
 line.setAttribute("opacity","0.9");
-
 }
 
-
 function renderBoard(fen,move=null){
-
 const g=new Chess(fen);
 const board=g.board();
-
 const el=$("board");
 el.innerHTML="";
 
@@ -1300,108 +1063,72 @@ const from=move?move.uci.slice(0,2):null;
 const to=move?move.uci.slice(2,4):null;
 
 board.forEach((rank,r)=>{
-
 rank.forEach((piece,c)=>{
-
 const s=document.createElement("div");
-
 s.className="sq "+((r+c)%2?"dark":"light");
 
 const square="abcdefgh"[c]+(8-r);
-
 if(square===from)s.classList.add("last-from");
 if(square===to)s.classList.add("last-to");
 
 if(piece){
-
 const img=document.createElement("img");
-
 img.src="pieces/"+piece.color+piece.type.toUpperCase()+".svg";
 img.alt=piece.color+" "+piece.type;
-
 s.appendChild(img);
-
 }
 
 if(move&&square===to){
-
 const badge=document.createElement("span");
-
 badge.className="sq-badge badge-"+cat(move.classification);
-
 badge.textContent=ICONS[move.classification]||"•";
 badge.title=move.classification;
-
 s.appendChild(badge);
-
 }
 
 if(c===0){
-
 const q=document.createElement("span");
-
 q.className="coord";
 q.textContent=8-r;
-
 s.appendChild(q);
-
 }
 
 if(r===7){
-
 const q=document.createElement("span");
-
 q.className="coord";
 q.style.top="auto";
 q.style.bottom="2px";
 q.textContent="abcdefgh"[c];
-
 s.appendChild(q);
-
 }
 
 el.appendChild(s);
-
 });
-
 });
-
 }
 
-
-/* PROBABILITY DISPLAY */
+/* PROBABILITY */
 
 function renderProbability(cp){
-
 const p=winProbability(cp);
 
 $("whiteProb").textContent="White: "+(p.whiteWin*100).toFixed(1)+"%";
 $("drawProb").textContent="Draw: "+(p.draw*100).toFixed(1)+"%";
 $("blackProb").textContent="Black: "+(p.blackWin*100).toFixed(1)+"%";
-
 $("evalWhite").style.width=(p.whiteEP*100)+"%";
-
 }
 
+function addParagraph(container,label,value){
+const p=document.createElement("p");
+const strong=document.createElement("strong");
+strong.textContent=label+": ";
+p.append(strong,document.createTextNode(value));
+container.appendChild(p);
+}
 
 /* MOVE DETAIL */
 
-function addParagraph(container,label,value){
-
-const p=document.createElement("p");
-
-const strong=document.createElement("strong");
-strong.textContent=label+": ";
-
-p.append(strong,document.createTextNode(value));
-
-container.appendChild(p);
-
-}
-
-
 function renderMove(ply){
-
 if(!current)return;
 
 cursor=clamp(ply,0,current.plies.length);
@@ -1414,16 +1141,10 @@ const m=cursor?results[cursor-1]:null;
 
 renderBoard(fen,m);
 
-/* Arrow appears when the played move differs from best move */
-
 if(m&&m.bestUci&&m.bestUci!==m.uci){
-
 renderArrow(m.bestUci);
-
 }else{
-
 renderArrow(null);
-
 }
 
 const evalv=m?m.afterScore:0;
@@ -1434,36 +1155,29 @@ $("evalScore").textContent=
 " · White EP "+(p.whiteEP*100).toFixed(1)+"%";
 
 $("moveCount").textContent=
-cursor===0?"Start position":"Move "+Math.ceil(cursor/2);
+cursor===0?"Start":"Move "+Math.ceil(cursor/2);
 
 renderProbability(evalv);
 
 $("firstMove").disabled=cursor===0;
 $("prevMove").disabled=cursor===0;
-
 $("nextMove").disabled=cursor>=current.plies.length;
 $("lastMove").disabled=cursor>=current.plies.length;
 
 if(m){
-
 $("reviewHeading").textContent=m.number+". "+m.san;
-
 $("moveDetail").innerHTML="";
 
 const badge=document.createElement("div");
-
 badge.className="classification-badge badge-"+cat(m.classification);
 badge.textContent=ICONS[m.classification]+" "+m.classification;
-
 $("moveDetail").appendChild(badge);
 
 const explanation=document.createElement("div");
-
 explanation.className="detail-text";
 
 const intro=document.createElement("p");
 intro.textContent=explainMove(m);
-
 explanation.appendChild(intro);
 
 addParagraph(explanation,"Played Move",m.san);
@@ -1472,28 +1186,20 @@ addParagraph(explanation,"Phase",m.phase);
 addParagraph(explanation,"Centipawn Loss",m.cpl.toFixed(1)+" cp");
 addParagraph(explanation,"Expected Points Loss",(m.loss*100).toFixed(2)+" percentage points");
 
-addParagraph(
-explanation,
-"Evaluation Before",
-(m.beforeScore>0?"+":"")+m.beforeScore.toFixed(2)
-);
+addParagraph(explanation,"Evaluation Before",
+(m.beforeScore>0?"+":"")+m.beforeScore.toFixed(2));
 
-addParagraph(
-explanation,
-"Evaluation After",
-(m.afterScore>0?"+":"")+m.afterScore.toFixed(2)
-);
+addParagraph(explanation,"Evaluation After",
+(m.afterScore>0?"+":"")+m.afterScore.toFixed(2));
 
 $("moveDetail").appendChild(explanation);
 
 /* WDL CARD */
-
 const card=document.createElement("div");
 card.className="prob-card";
 
 const heading=document.createElement("strong");
 heading.textContent="Expected Result After Move";
-
 card.appendChild(heading);
 
 [
@@ -1501,7 +1207,6 @@ card.appendChild(heading);
 ["Draw",m.afterWDL.draw],
 ["Loss",m.afterWDL.loss]
 ].forEach(([name,value])=>{
-
 const row=document.createElement("div");
 row.className="prob-row";
 
@@ -1521,29 +1226,21 @@ fill.className="prob-fill";
 fill.style.width=(value*100)+"%";
 
 track.appendChild(fill);
-
 card.append(row,track);
-
 });
 
 $("moveDetail").appendChild(card);
 
 }else{
-
 $("reviewHeading").textContent="Starting Position";
-
 $("moveDetail").textContent=
 "Starting position. Analyse the game to see move classifications, estimated rating and Stockfish's recommendations.";
-
 renderArrow(null);
-
 }
 
 renderMoves();
 renderGraph();
-
 }
-
 
 /* NAVIGATION */
 
@@ -1552,15 +1249,12 @@ $("prevMove").onclick=()=>renderMove(cursor-1);
 $("nextMove").onclick=()=>renderMove(cursor+1);
 $("lastMove").onclick=()=>renderMove(current.plies.length);
 
-
 /* ANALYSIS */
 
 async function analyse(){
-
 if(!current||analysisBusy)return;
 
 analysisBusy=true;
-
 const run=++latestAnalysis;
 
 $("analyseBtn").disabled=true;
@@ -1577,95 +1271,61 @@ renderMove(0);
 $("analysisProgress").textContent="Starting Stockfish...";
 
 try{
-
 await ensureEngine();
 
 const depth=Number($("depthSelect").value);
-
-/* Analyse starting position */
-
 let before=await analyzeFen(current.startFen,depth);
 
 for(let i=0;i<current.plies.length;i++){
-
 if(run!==latestAnalysis)break;
 
 const p=current.plies[i];
 
-/* Best move before user's move */
-
 const bestUci=before.bestMove;
 const bestSan=sanFromUci(p.before,bestUci);
 
-/* Analyse position after user's move */
-
 const after=await analyzeFen(p.after,depth);
-
 if(run!==latestAnalysis)break;
 
-/* Compare expected points */
-
-const isBest=
-!!bestUci&&
+const isBest=!!bestUci&&
 p.uci.toLowerCase()===bestUci.toLowerCase();
 
 const beforeEP=moverEP(before.score,p.color);
 const afterEP=moverEP(after.score,p.color);
 
+/* Expected-points loss */
 const loss=clamp(beforeEP-afterEP,0,1);
 
-/* Centipawn loss from mover's perspective */
-
-const beforePerspective=
-p.color==="w"?before.score:-before.score;
-
-const afterPerspective=
-p.color==="w"?after.score:-after.score;
+/* CPL from the player's perspective */
+const beforePerspective=p.color==="w"?before.score:-before.score;
+const afterPerspective=p.color==="w"?after.score:-after.score;
 
 const cpl=clamp(
 (beforePerspective-afterPerspective)*100,
-0,
-10000
+0,10000
 );
 
-/* Phase */
-
 const phase=getPhase(p.before,p.number);
-
-/* Classification */
-
 const classification=classifyMove(isBest,loss);
 
 results.push({
-
 ...p,
-
 beforeScore:before.score,
 afterScore:after.score,
-
 beforeEP,
 afterEP,
-
 beforeWDL:moverWDL(before.score,p.color),
 afterWDL:moverWDL(after.score,p.color),
-
 bestMove:bestSan,
 bestUci,
-
 loss,
 cpl,
-
 phase,
 classification,
 isBest
-
 });
 
-/* Next position */
-
 before=after;
-
-/* Live update */
 
 $("analysisProgress").textContent=
 "Analysed "+(i+1)+" / "+current.plies.length+
@@ -1676,46 +1336,33 @@ renderMoves();
 renderGraph();
 
 if(cursor>0)renderMove(cursor);
-
 }
 
 if(run===latestAnalysis){
-
 $("analysisProgress").textContent="Analysis complete.";
 $("engineStatus").textContent="Stockfish analysis completed.";
-
 renderSummary();
 renderMoves();
 renderGraph();
 renderMove(cursor);
-
 }
 
 }catch(e){
-
 if(run===latestAnalysis){
-
 $("analysisProgress").textContent=e.message;
 $("analysisProgress").classList.add("error");
-
 }
-
 }finally{
-
 analysisBusy=false;
 $("analyseBtn").disabled=false;
-
 }
-
 }
 
 $("analyseBtn").onclick=analyse;
 
-
 /* START GAME */
 
 function startGame(game){
-
 latestAnalysis++;
 
 current=game;
@@ -1734,21 +1381,17 @@ analysisBusy?"Previous analysis is finishing...":"";
 $("analysisProgress").classList.remove("error");
 
 [
-"whiteRating",
-"blackRating",
-"whiteAccuracy",
-"blackAccuracy",
-"whiteCPL",
-"blackCPL",
-"openingAccuracy",
-"middlegameAccuracy",
-"endgameAccuracy"
+"whiteRating","blackRating",
+"whiteAccuracy","blackAccuracy",
+"whiteCPL","blackCPL",
+"openingAccuracy","middlegameAccuracy","endgameAccuracy"
 ].forEach(id=>$(id).textContent="—");
 
+$("whiteConfidence").textContent="Awaiting analysis";
+$("blackConfidence").textContent="Awaiting analysis";
+
 [
-"openingBar",
-"middlegameBar",
-"endgameBar"
+"openingBar","middlegameBar","endgameBar"
 ].forEach(id=>$(id).style.width="0%");
 
 renderSummary();
@@ -1757,9 +1400,7 @@ renderGraph();
 renderMove(0);
 
 $("reviewSection").scrollIntoView({behavior:"smooth"});
-
 message("Game loaded successfully. Press Analyse Game to begin.");
-
 }
 
 })();
