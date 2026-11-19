@@ -485,17 +485,6 @@ function startStockfish(){
   }
 }
 
-/*
-  STOCKFISH EVALUATION FIX
-
-  Stockfish reports:
-  - cp: centipawns (100 cp = 1 pawn)
-  - mate: mate distance (NOT pawn units)
-
-  The score is converted to White's perspective.
-  Mate scores remain separate and are never treated as pawns.
-*/
-
 function scoreToWhite(message,fen){
   const match = message.match(/\bscore (cp|mate) (-?\d+)/);
   if(!match) return null;
@@ -558,12 +547,6 @@ function analyzeFen(fen,depth=15){
           const previousDepth = latestEvaluation
             ? latestEvaluation.depth
             : -1;
-
-          /*
-            Keep the deepest available evaluation.
-            At the same depth, prefer mate information
-            over centipawn information.
-          */
 
           if(
             currentDepth > previousDepth ||
@@ -657,16 +640,10 @@ function pieceName(piece){
   })[piece] || "piece";
 }
 
-/*
-  EXPLANATION FIX
-
-  - Genuine centipawn scores are used for pawn-loss calculations.
-  - Mate scores are handled separately.
-  - No artificial 100-pawn cap.
-  - Original explanation wording is preserved for normal positions.
-*/
+/* ---------------- WRONG MOVE EXPLANATION ---------------- */
 
 function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
+
   if(!beforeResult || !afterResult){
     return "Stockfish could not complete the evaluation.";
   }
@@ -676,12 +653,12 @@ function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
   let reason = "This reply creates a strong tactical or positional threat and leaves your position under pressure.";
 
   if(reply){
-    if(reply.checkmate){
-      reason = "This move delivers checkmate, so the position is immediately lost.";
+    if(reply.captured){
+      reason = "This move captures your "+pieceName(reply.captured)+", winning material.";
+    }else if(reply.checkmate){
+      reason = "This move delivers a decisive attack.";
     }else if(reply.check){
       reason = "This move gives check, forcing your king to respond.";
-    }else if(reply.captured){
-      reason = "This move captures your "+pieceName(reply.captured)+", winning material.";
     }else{
       reason = "This move is the engine's strongest reply.";
     }
@@ -692,34 +669,38 @@ function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
     : "Stockfish could not identify a legal reply to display. ";
 
   /*
-    If the engine reports a forced mate, do not convert
-    that mate distance into a pawn evaluation.
+    SPECIAL CASE:
+    Show a different message ONLY when the engine
+    finds a forced checkmate against the player's side.
+
+    Mate for the player's side does NOT trigger this message.
+    Ordinary positions retain the original explanation.
   */
 
   if(
-    beforeResult.evaluationType === "mate" ||
-    afterResult.evaluationType === "mate"
+    afterResult.evaluationType==="mate" &&
+    Number.isFinite(afterResult.mate)
   ){
-    let mateText = "";
 
-    if(afterResult.evaluationType === "mate"){
-      const mateForMover = moverColor==="w"
-        ? afterResult.mate
-        : -afterResult.mate;
+    const mateForMover = moverColor==="w"
+      ? afterResult.mate
+      : -afterResult.mate;
 
-      if(mateForMover < 0){
-        mateText = "The engine finds a forced checkmate against your side.";
-      }else if(mateForMover > 0){
-        mateText = "The engine finds a forced checkmate for your side.";
-      }else{
-        mateText = "The engine reports a checkmate position.";
-      }
-    }else{
-      mateText = "The engine detects a forced checkmate in the analyzed position.";
+    if(mateForMover<0){
+      const mateDistance = Math.abs(afterResult.mate);
+
+      const mateText = mateDistance===1
+        ? "The engine finds a forced checkmate against your side in 1 move."
+        : "The engine finds a forced checkmate against your side in "+mateDistance+" moves.";
+
+      return moveText+reason+" "+mateText;
     }
-
-    return moveText+reason+" "+mateText;
   }
+
+  /*
+    For every other situation, preserve the normal
+    pawn evaluation explanation.
+  */
 
   if(
     beforeResult.score===null ||
@@ -727,6 +708,7 @@ function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
     !Number.isFinite(beforeResult.score) ||
     !Number.isFinite(afterResult.score)
   ){
+
     return moveText+reason+" Stockfish could not produce a reliable pawn evaluation.";
   }
 
@@ -738,8 +720,7 @@ function makeExplanation(beforeResult,afterResult,moverColor,afterFen){
     ? afterResult.score
     : -afterResult.score;
 
-  // Both scores are in pawn units, not centipawns.
-  // There is deliberately no artificial maximum cap.
+  // Existing pawn calculation preserved.
   const rawLoss = before-after;
   const loss = Math.max(0,rawLoss);
 
