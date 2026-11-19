@@ -6,160 +6,628 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#090b10">
 <title>Puzzle Library — PuzzleForge</title>
+
 <style>
-:root{color-scheme:dark;--bg:#090b10;--panel:#171b24;--line:#292f3b;--text:#f4f5f7;--muted:#9299a8;--gold:#cbb36a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,Arial,sans-serif}
+:root{
+  color-scheme:dark;
+  --bg:#090b10;
+  --panel:#171b24;
+  --line:#292f3b;
+  --text:#f4f5f7;
+  --muted:#9299a8;
+  --gold:#cbb36a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font:15px/1.5 system-ui,Arial,sans-serif
+}
 .container{width:min(950px,calc(100% - 32px));margin:auto}
 header{border-bottom:1px solid var(--line);padding:17px 0}
-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-a{color:inherit;text-decoration:none}.brand{font-size:20px;font-weight:750}
-nav a:not(.brand){padding:9px 12px;background:#171b24;border:1px solid var(--line);border-radius:8px;font-size:13px}
-main{padding:35px 0 60px}h1{font-size:32px;margin:0 0 5px}h2{font-size:18px;margin:0 0 5px}
+nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap
+}
+a{color:inherit;text-decoration:none}
+.brand{font-size:20px;font-weight:750}
+nav a:not(.brand){
+  padding:9px 12px;
+  background:#171b24;
+  border:1px solid var(--line);
+  border-radius:8px;
+  font-size:13px
+}
+main{padding:35px 0 60px}
+h1{font-size:32px;margin:0 0 5px}
+h2{font-size:18px;margin:0 0 5px}
 .muted{color:var(--muted);font-size:13px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px;margin-top:20px}
-label{display:block;color:var(--muted);font-size:12px;margin:13px 0 5px}
-input,textarea{width:100%;background:#0e121a;border:1px solid #343b48;border-radius:8px;padding:12px;color:white;font:inherit;outline:none}
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:13px;
+  padding:20px;
+  margin-top:20px
+}
+label{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin:13px 0 5px
+}
+input,textarea{
+  width:100%;
+  background:#0e121a;
+  border:1px solid #343b48;
+  border-radius:8px;
+  padding:12px;
+  color:white;
+  font:inherit;
+  outline:none
+}
 input:focus,textarea:focus{border-color:var(--gold)}
 textarea{min-height:85px;resize:vertical}
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.btn{background:var(--gold);color:#111;border:0;border-radius:8px;padding:11px 16px;font-weight:700;margin-top:15px}
+.fields{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px
+}
+.btn{
+  background:var(--gold);
+  color:#111;
+  border:0;
+  border-radius:8px;
+  padding:11px 16px;
+  font-weight:700;
+  margin-top:15px;
+  cursor:pointer
+}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.message{font-size:12px;min-height:20px;margin-top:10px;color:#a9c99b}
+.message{
+  font-size:12px;
+  min-height:20px;
+  margin-top:10px;
+  color:#a9c99b
+}
 .list{display:grid;gap:10px;margin-top:17px}
-.puzzle{background:#10141d;border:1px solid var(--line);border-radius:10px;padding:15px}
-.puzzle strong{font-size:14px}.puzzle small{display:block;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}
-.delete{margin-top:10px;background:transparent;border:1px solid #555d6b;color:#eee;border-radius:7px;padding:7px 10px;font-size:12px}
-@media(max-width:600px){h1{font-size:27px}.fields{grid-template-columns:1fr}}
+.puzzle{
+  background:#10141d;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:15px
+}
+.puzzle strong{font-size:14px}
+.puzzle small{
+  display:block;
+  color:var(--muted);
+  margin-top:5px;
+  overflow-wrap:anywhere
+}
+.delete{
+  margin-top:10px;
+  background:transparent;
+  border:1px solid #555d6b;
+  color:#eee;
+  border-radius:7px;
+  padding:7px 10px;
+  font-size:12px;
+  cursor:pointer
+}
+.format-note{
+  background:#10141d;
+  border:1px solid #343b48;
+  border-radius:8px;
+  padding:12px;
+  margin-top:10px;
+  font-size:12px;
+  color:var(--muted)
+}
+.format-note code{
+  display:block;
+  color:#cbb36a;
+  margin-top:5px;
+  overflow-wrap:anywhere
+}
+@media(max-width:600px){
+  h1{font-size:27px}
+  .fields{grid-template-columns:1fr}
+}
 </style>
 </head>
+
 <body>
-<header><div class="container"><nav>
-<a class="brand" href="index.html">♟ PuzzleForge</a>
-<div><a href="dashboard.html">Dashboard</a> <a href="stats.html">Statistics</a></div>
-</nav></div></header>
+
+<header>
+  <div class="container">
+    <nav>
+      <a class="brand" href="index.html">♟ PuzzleForge</a>
+      <div>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="stats.html">Statistics</a>
+      </div>
+    </nav>
+  </div>
+</header>
 
 <main class="container">
+
 <h1>Puzzle Library</h1>
 <p class="muted" id="account">Loading account…</p>
 
 <section class="card">
-<h2>Community Puzzles</h2>
-<p class="muted">Browse puzzles shared by PuzzleForge users.</p>
-<div class="list" id="puzzleList"><p class="muted">Loading public puzzles…</p></div>
+  <h2>Community Puzzles</h2>
+  <p class="muted">Browse puzzles shared by PuzzleForge users.</p>
+  <div class="list" id="puzzleList">
+    <p class="muted">Loading public puzzles…</p>
+  </div>
 </section>
 
 <section class="card">
-<h2>Upload a Puzzle</h2>
-<p class="muted">Uploaded puzzles are public and may be added to the training decks.</p>
 
-<div id="uploadForm">
-<label for="fen">Puzzle FEN</label>
-<textarea id="fen" placeholder="Paste the starting FEN position"></textarea>
+  <h2>Upload a Puzzle</h2>
+  <p class="muted">
+    Uploaded puzzles are public and may be added to the training decks.
+  </p>
 
-<label for="moves">Solution moves (UCI)</label>
-<input id="moves" placeholder="Example: e2e4 e7e5 g1f3">
+  <div id="uploadForm">
 
-<div class="fields">
-<div>
-<label for="rating">Puzzle rating</label>
-<input id="rating" type="number" min="1" max="4000" placeholder="1500">
-</div>
-<div>
-<label for="themes">Themes</label>
-<input id="themes" placeholder="fork, pin, mate">
-</div>
-</div>
+    <label for="fen">Puzzle FEN</label>
+    <textarea
+      id="fen"
+      placeholder="Paste the starting FEN position"
+    ></textarea>
 
-<label for="gameUrl">Original game URL (optional)</label>
-<input id="gameUrl" type="url" placeholder="https://lichess.org/...">
+    <label for="moves">Solution moves (Standard SAN)</label>
+    <textarea
+      id="moves"
+      placeholder="Example: 1. e4 e5 2. Nf3 Nc6 3. Bb5"
+    ></textarea>
 
-<button class="btn" id="uploadBtn" disabled>Upload Public Puzzle</button>
-<div class="message" id="message"></div>
-<p class="muted" id="loginNote">Sign in with Google from the Home Page to upload puzzles.</p>
-</div>
+    <div class="format-note">
+      **Accepted format: Standard Algebraic Notation (SAN)**
+      <code>1. e4 e5 2. Nf3 Nc6 3. Bb5</code>
+      You can include move numbers, castling, captures, checks and checkmates.
+      The moves must be legal from the supplied FEN.
+    </div>
+
+    <div class="fields">
+      <div>
+        <label for="rating">Puzzle rating</label>
+        <input
+          id="rating"
+          type="number"
+          min="1"
+          max="4000"
+          placeholder="1500"
+        >
+      </div>
+
+      <div>
+        <label for="themes">Themes</label>
+        <input
+          id="themes"
+          placeholder="fork, pin, mate"
+        >
+      </div>
+    </div>
+
+    <label for="gameUrl">Original game URL (optional)</label>
+    <input
+      id="gameUrl"
+      type="url"
+      placeholder="https://lichess.org/..."
+    >
+
+    <button class="btn" id="uploadBtn" disabled>
+      Upload Public Puzzle
+    </button>
+
+    <div class="message" id="message"></div>
+
+    <p class="muted" id="loginNote">
+      Sign in with Google from the Home Page to upload puzzles.
+    </p>
+
+  </div>
 </section>
+
 </main>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<!-- Chess.js is used to validate SAN moves and convert them internally. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
 <script src="firebase-cloud.js"></script>
+
 <script>
 (()=>{
 "use strict";
+
 const $=id=>document.getElementById(id);
-let user=null,puzzles=[];
-function message(text,error=false){$("message").textContent=text;$("message").style.color=error?"#e5a09a":"#a9c99b"}
+
+let user=null;
+let puzzles=[];
+
+function message(text,error=false){
+  $("message").textContent=text;
+  $("message").style.color=error?"#e5a09a":"#a9c99b";
+}
+
 function renderAuth(){
- $("account").textContent=user?"Signed in as "+(user.displayName||user.email):"Browsing as guest";
- $("uploadBtn").disabled=!user;
- $("loginNote").textContent=user?"Your puzzle will be public and available to other users.":"Sign in with Google from the Home Page to upload puzzles.";
+
+  $("account").textContent=user
+    ?"Signed in as "+(user.displayName||user.email)
+    :"Browsing as guest";
+
+  $("uploadBtn").disabled=!user;
+
+  $("loginNote").textContent=user
+    ?"Your puzzle will be public and available to other users."
+    :"Sign in with Google from the Home Page to upload puzzles.";
 }
+
+/*
+  Convert standard SAN notation into UCI internally.
+
+  Example:
+  SAN: 1. e4 e5 2. Nf3 Nc6
+  UCI: e2e4 e7e5 g1f3 b8c6
+
+  This preserves compatibility with the existing
+  PuzzleForge puzzle system.
+*/
+
+function convertSANtoUCI(fen,sanText){
+
+  if(typeof Chess==="undefined"){
+    throw new Error("Chess library could not load. Please refresh the page.");
+  }
+
+  let game;
+
+  try{
+    game=new Chess(fen);
+  }catch(error){
+    throw new Error("Invalid FEN position. Please check your FEN.");
+  }
+
+  if(!game){
+    throw new Error("Invalid FEN position.");
+  }
+
+  let text=sanText;
+
+  // Remove PGN comments.
+  text=text.replace(/\{[^}]*\}/g," ");
+
+  // Remove semicolon comments.
+  text=text.replace(/;[^\r\n]*/g," ");
+
+  // Remove simple PGN variations.
+  text=text.replace(/\([^)]*\)/g," ");
+
+  // Remove annotation glyphs.
+  text=text.replace(/\$\d+/g," ");
+
+  // Remove game result markers.
+  text=text.replace(/\b(?:1-0|0-1|1\/2-1\/2|\*)\b/g," ");
+
+  // Remove standalone en-passant notation.
+  text=text.replace(/\be\.p\./gi," ");
+
+  const tokens=text.trim().split(/\s+/).filter(Boolean);
+
+  const uciMoves=[];
+
+  for(let token of tokens){
+
+    // Ignore standalone move numbers: 1. or 1...
+    if(/^\d+\.(?:\.\.)?$/.test(token)){
+      continue;
+    }
+
+    // Remove move number prefixes: 1.e4 or 1...e5
+    token=token.replace(/^\d+\.(?:\.\.)?/,"");
+
+    if(!token){
+      continue;
+    }
+
+    // Ignore ellipsis tokens.
+    if(/^\.+$/.test(token)){
+      continue;
+    }
+
+    // Remove trailing annotation marks.
+    token=token.replace(/[!?]+$/,"");
+
+    // Normalize zero-based castling notation.
+    token=token.replace(/^0-0-0/i,"O-O-O");
+    token=token.replace(/^0-0/i,"O-O");
+
+    if(!token){
+      continue;
+    }
+
+    let move=null;
+
+    try{
+      move=game.move(token,{sloppy:true});
+    }catch(error){
+      move=null;
+    }
+
+    if(!move){
+      throw new Error(
+        'Invalid SAN move "'+token+'". Check the move sequence and FEN.'
+      );
+    }
+
+    // Convert the validated move to UCI.
+    let uci=move.from+move.to;
+
+    if(move.promotion){
+      uci+=move.promotion;
+    }
+
+    uciMoves.push(uci);
+  }
+
+  if(uciMoves.length<2){
+    throw new Error("Please enter at least two legal SAN moves.");
+  }
+
+  return uciMoves;
+}
+
 function renderPuzzles(){
- const box=$("puzzleList");box.replaceChildren();
- if(!puzzles.length){const p=document.createElement("p");p.className="muted";p.textContent="No community-uploaded puzzles yet.";box.appendChild(p);return}
- puzzles.forEach(p=>{
-  const item=document.createElement("div");item.className="puzzle";
-  const title=document.createElement("strong");title.textContent="Puzzle · Rating "+(p.rating||"Unrated");
-  const detail=document.createElement("small");
-  const themes=Array.isArray(p.themes)?p.themes.join(", "):"";
-  detail.textContent=(themes?"Themes: "+themes+" · ":"")+"Puzzle ID: "+(p.id||"");
-  item.append(title,detail);
-  if(p.gameUrl){
-   const link=document.createElement("a");link.href=p.gameUrl;link.target="_blank";link.rel="noopener noreferrer";
-   link.textContent="View original game";link.style.display="inline-block";link.style.marginTop="9px";link.style.fontSize="12px";link.style.color="#cbb36a";item.appendChild(link);
+
+  const box=$("puzzleList");
+  box.replaceChildren();
+
+  if(!puzzles.length){
+
+    const p=document.createElement("p");
+    p.className="muted";
+    p.textContent="No community-uploaded puzzles yet.";
+
+    box.appendChild(p);
+    return;
   }
-  if(user&&p.ownerId===user.uid){
-   const del=document.createElement("button");del.className="delete";del.textContent="Delete my puzzle";
-   del.addEventListener("click",async()=>{
-    if(!confirm("Delete this puzzle?"))return;
-    try{await window.PF.deletePuzzle(p.id);await loadPuzzles();message("Puzzle deleted.");}
-    catch(e){message(e.message||"Could not delete puzzle.",true)}
-   });
-   item.appendChild(del);
-  }
-  box.appendChild(item);
- });
+
+  puzzles.forEach(p=>{
+
+    const item=document.createElement("div");
+    item.className="puzzle";
+
+    const title=document.createElement("strong");
+    title.textContent="Puzzle · Rating "+(p.rating||"Unrated");
+
+    const detail=document.createElement("small");
+
+    const themes=Array.isArray(p.themes)
+      ?p.themes.join(", ")
+      :"";
+
+    detail.textContent=
+      (themes?"Themes: "+themes+" · ":"")+
+      "Puzzle ID: "+(p.id||"");
+
+    item.append(title,detail);
+
+    if(p.gameUrl){
+
+      const link=document.createElement("a");
+
+      link.href=p.gameUrl;
+      link.target="_blank";
+      link.rel="noopener noreferrer";
+      link.textContent="View original game";
+
+      link.style.display="inline-block";
+      link.style.marginTop="9px";
+      link.style.fontSize="12px";
+      link.style.color="#cbb36a";
+
+      item.appendChild(link);
+    }
+
+    if(user&&p.ownerId===user.uid){
+
+      const del=document.createElement("button");
+
+      del.className="delete";
+      del.textContent="Delete my puzzle";
+
+      del.addEventListener("click",async()=>{
+
+        if(!confirm("Delete this puzzle?"))return;
+
+        try{
+
+          await window.PF.deletePuzzle(p.id);
+
+          await loadPuzzles();
+
+          message("Puzzle deleted.");
+
+        }catch(e){
+
+          message(e.message||"Could not delete puzzle.",true);
+        }
+      });
+
+      item.appendChild(del);
+    }
+
+    box.appendChild(item);
+  });
 }
+
 async function loadPuzzles(){
- if(!window.PF?.getPublicPuzzles){$("puzzleList").textContent="Firebase library is unavailable.";return}
- try{
-  const data=await window.PF.getPublicPuzzles();
-  puzzles=Array.isArray(data)?data:(Array.isArray(data?.puzzles)?data.puzzles:[]);
-  renderPuzzles();
- }catch(e){console.error(e);$("puzzleList").textContent="Could not load public puzzles."}
+
+  if(!window.PF?.getPublicPuzzles){
+
+    $("puzzleList").textContent="Firebase library is unavailable.";
+    return;
+  }
+
+  try{
+
+    const data=await window.PF.getPublicPuzzles();
+
+    puzzles=Array.isArray(data)
+      ?data
+      :(Array.isArray(data?.puzzles)?data.puzzles:[]);
+
+    renderPuzzles();
+
+  }catch(e){
+
+    console.error(e);
+
+    $("puzzleList").textContent="Could not load public puzzles.";
+  }
 }
+
 $("uploadBtn").addEventListener("click",async()=>{
- if(!user){message("Sign in with Google before uploading.",true);return}
- const fen=$("fen").value.trim();
- const movesText=$("moves").value.trim();
- const rating=Number($("rating").value);
- const themes=$("themes").value.split(",").map(x=>x.trim()).filter(Boolean);
- const gameUrl=$("gameUrl").value.trim();
 
- if(!fen||!movesText||!$("rating").value){message("FEN, solution moves and rating are required.",true);return}
- if(!Number.isInteger(rating)||rating<1||rating>4000){message("Rating must be between 1 and 4000.",true);return}
- const moves=movesText.split(/[\s,]+/).filter(Boolean);
- if(moves.length<2||moves.some(m=>!/^[a-h][1-8][a-h][1-8][qrbnQRBN]?$/.test(m))){message("Enter at least two valid UCI moves.",true);return}
- if(gameUrl){try{const u=new URL(gameUrl);if(!["http:","https:"].includes(u.protocol))throw Error()}catch(e){message("Enter a valid game URL.",true);return}}
+  if(!user){
 
- const btn=$("uploadBtn");btn.disabled=true;message("Uploading puzzle…");
- try{
-  await window.PF.uploadPuzzle({fen,moves,rating,themes,gameUrl});
-  $("fen").value="";$("moves").value="";$("rating").value="";$("themes").value="";$("gameUrl").value="";
-  message("Puzzle uploaded successfully.");
-  await loadPuzzles();
- }catch(e){console.error(e);message(e.message||"Upload failed.",true)}
- finally{btn.disabled=!user}
+    message("Sign in with Google before uploading.",true);
+    return;
+  }
+
+  const fen=$("fen").value.trim();
+  const sanText=$("moves").value.trim();
+
+  const rating=Number($("rating").value);
+
+  const themes=$("themes").value
+    .split(",")
+    .map(x=>x.trim())
+    .filter(Boolean);
+
+  const gameUrl=$("gameUrl").value.trim();
+
+  if(!fen||!sanText||!$("rating").value){
+
+    message("FEN, SAN solution and rating are required.",true);
+    return;
+  }
+
+  if(!Number.isInteger(rating)||rating<1||rating>4000){
+
+    message("Rating must be between 1 and 4000.",true);
+    return;
+  }
+
+  let moves;
+
+  try{
+
+    // Validate SAN and convert to UCI.
+    moves=convertSANtoUCI(fen,sanText);
+
+  }catch(e){
+
+    message(e.message||"Invalid SAN solution.",true);
+    return;
+  }
+
+  if(gameUrl){
+
+    try{
+
+      const u=new URL(gameUrl);
+
+      if(!["http:","https:"].includes(u.protocol)){
+        throw Error();
+      }
+
+    }catch(e){
+
+      message("Enter a valid game URL.",true);
+      return;
+    }
+  }
+
+  const btn=$("uploadBtn");
+
+  btn.disabled=true;
+  message("Validating and uploading puzzle…");
+
+  try{
+
+    await window.PF.uploadPuzzle({
+      fen,
+      moves,
+      rating,
+      themes,
+      gameUrl
+    });
+
+    $("fen").value="";
+    $("moves").value="";
+    $("rating").value="";
+    $("themes").value="";
+    $("gameUrl").value="";
+
+    message("Puzzle uploaded successfully.");
+
+    await loadPuzzles();
+
+  }catch(e){
+
+    console.error(e);
+
+    message(e.message||"Upload failed.",true);
+
+  }finally{
+
+    btn.disabled=!user;
+  }
 });
-window.addEventListener("puzzleforge:auth",e=>{user=e.detail?.user??window.PF?.user??null;renderAuth();loadPuzzles()});
+
+window.addEventListener("puzzleforge:auth",e=>{
+
+  user=e.detail?.user??window.PF?.user??null;
+
+  renderAuth();
+  loadPuzzles();
+});
+
 window.addEventListener("puzzleforge:cloud-synced",loadPuzzles);
+
 async function init(){
- if(window.PF?.authReady)await window.PF.authReady;
- user=window.PF?.user||null;renderAuth();await loadPuzzles();
+
+  if(window.PF?.authReady){
+    await window.PF.authReady;
+  }
+
+  user=window.PF?.user||null;
+
+  renderAuth();
+
+  await loadPuzzles();
 }
-init().catch(e=>{console.error(e);$("account").textContent="Firebase initialization failed"});
+
+init().catch(e=>{
+
+  console.error(e);
+
+  $("account").textContent="Firebase initialization failed";
+});
+
 })();
 </script>
+
 </body>
 </html>
