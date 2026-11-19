@@ -43,7 +43,6 @@ body{
   padding:28px 16px;
 }
 
-/* Dashboard-matching brand */
 .brand{
   display:block;
   padding:0 8px 30px;
@@ -167,6 +166,17 @@ body{
   color:#c9b575;
   font-size:12px;
   font-weight:700;
+}
+
+/* Game Review card accent */
+
+.game-review-card{
+  border-color:#49432e;
+  background:linear-gradient(135deg,#171812,#10141d 70%);
+}
+
+.game-review-card:hover{
+  border-color:var(--gold);
 }
 
 /* Authentication */
@@ -337,13 +347,11 @@ body{
   <!-- Sidebar -->
   <aside class="sidebar" aria-label="Main navigation">
 
-    <!-- Dashboard-matching logo -->
     <a class="brand" href="index.html">♟ PuzzleForge</a>
 
-    <!-- Navigation: requested order -->
     <nav class="nav">
 
-      <a class="active" href="dashboard.html">
+      <a href="dashboard.html">
         <svg viewBox="0 0 24 24">
           <rect x="3" y="3" width="8" height="8" rx="1.5"/>
           <rect x="14" y="3" width="7" height="5" rx="1.5"/>
@@ -386,6 +394,16 @@ body{
         <span>Library</span>
       </a>
 
+      <!-- NEW: Game Review -->
+      <a href="game-review.html">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 3v18h18"/>
+          <path d="m7 14 4-4 3 3 6-7"/>
+          <path d="M16 6h4v4"/>
+        </svg>
+        <span>Game Review</span>
+      </a>
+
     </nav>
   </aside>
 
@@ -425,7 +443,7 @@ body{
       </div>
     </div>
 
-    <!-- Homepage buttons: requested order -->
+    <!-- Homepage buttons -->
     <section class="home-links">
 
       <a href="dashboard.html" class="session-card">
@@ -456,6 +474,13 @@ body{
         <h3>05. LIBRARY</h3>
         <p>Browse and explore your puzzle collection.</p>
         <span>Open Library →</span>
+      </a>
+
+      <!-- NEW: Game Review Homepage Card -->
+      <a href="game-review.html" class="session-card game-review-card">
+        <h3>06. GAME REVIEW</h3>
+        <p>Analyze your chess games with Stockfish. Find mistakes, blunders, brilliant moves and better continuations.</p>
+        <span>Review Your Game →</span>
       </a>
 
     </section>
