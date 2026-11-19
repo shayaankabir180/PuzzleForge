@@ -6,147 +6,1045 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#090b10">
 <title>Statistics — PuzzleForge</title>
+
 <style>
-:root{color-scheme:dark;--bg:#090b10;--panel:#171b24;--line:#292f3b;--text:#f4f5f7;--muted:#9299a8;--gold:#cbb36a}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,Arial,sans-serif}
-.container{width:min(1100px,calc(100% - 32px));margin:auto}
-header{border-bottom:1px solid var(--line);padding:17px 0}
-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-a{color:inherit;text-decoration:none}.brand{font-size:20px;font-weight:750}
-nav a:not(.brand){padding:9px 12px;background:#171b24;border:1px solid var(--line);border-radius:8px;font-size:13px}
-main{padding:35px 0 60px}h1{font-size:32px;margin:0 0 5px}h2{font-size:17px;margin:0 0 5px}
-.muted{color:var(--muted);font-size:13px}
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:22px 0}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:19px;margin-bottom:15px}
-.value{font-size:27px;font-weight:750;margin-top:8px}
-.label{font-size:12px;color:var(--muted)}
-.chart{height:190px;display:flex;align-items:flex-end;gap:10px;border-bottom:1px solid var(--line);padding:12px 3px 0;overflow:hidden}
-.column{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px}
-.bar{width:min(28px,75%);background:var(--gold);border-radius:5px 5px 0 0;min-height:2px}
-.column strong{font-size:10px;white-space:nowrap}.column small{font-size:10px;color:var(--muted);white-space:nowrap}
-.history{display:grid;gap:9px;margin-top:15px}
-.item{display:flex;justify-content:space-between;gap:12px;padding:12px;background:#10141d;border:1px solid var(--line);border-radius:9px;font-size:12px}
-.item small{color:var(--muted);display:block}.item time{color:var(--muted);white-space:nowrap}
-@media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}h1{font-size:27px}.chart{gap:5px}}
+:root{
+  color-scheme:dark;
+  --bg:#090b10;
+  --panel:#171b24;
+  --line:#292f3b;
+  --text:#f4f5f7;
+  --muted:#9299a8;
+  --gold:#cbb36a;
+  --green:#65c18c;
+}
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font:15px/1.5 system-ui,Arial,sans-serif;
+}
+
+.container{
+  width:min(1100px,calc(100% - 32px));
+  margin:auto;
+}
+
+header{
+  border-bottom:1px solid var(--line);
+  padding:17px 0;
+}
+
+nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+a{
+  color:inherit;
+  text-decoration:none;
+}
+
+.brand{
+  font-size:20px;
+  font-weight:750;
+}
+
+nav a:not(.brand){
+  display:inline-block;
+  padding:9px 12px;
+  background:#171b24;
+  border:1px solid var(--line);
+  border-radius:8px;
+  font-size:13px;
+  margin-left:4px;
+}
+
+main{
+  padding:35px 0 60px;
+}
+
+h1{
+  font-size:32px;
+  margin:0 0 5px;
+}
+
+h2{
+  font-size:17px;
+  margin:0 0 5px;
+}
+
+.muted{
+  color:var(--muted);
+  font-size:13px;
+}
+
+.section-title{
+  margin:27px 0 12px;
+  font-size:19px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin:18px 0;
+}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:13px;
+  padding:19px;
+  margin-bottom:15px;
+  min-width:0;
+}
+
+.value{
+  font-size:27px;
+  font-weight:750;
+  margin-top:8px;
+  overflow-wrap:anywhere;
+}
+
+.label{
+  font-size:12px;
+  color:var(--muted);
+}
+
+.chart{
+  height:190px;
+  display:flex;
+  align-items:stretch;
+  gap:10px;
+  border-bottom:1px solid var(--line);
+  padding:12px 3px 0;
+  overflow-x:auto;
+  overflow-y:hidden;
+}
+
+.column{
+  flex:1;
+  min-width:0;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+}
+
+.column strong{
+  font-size:10px;
+  white-space:nowrap;
+}
+
+.bar-wrap{
+  flex:1;
+  width:100%;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  min-height:0;
+}
+
+.bar{
+  width:min(28px,75%);
+  background:var(--gold);
+  border-radius:5px 5px 0 0;
+  min-height:2px;
+  transition:height .3s;
+}
+
+.column small{
+  font-size:10px;
+  color:var(--muted);
+  white-space:nowrap;
+  flex-shrink:0;
+}
+
+.history{
+  display:grid;
+  gap:9px;
+  margin-top:15px;
+}
+
+.item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  background:#10141d;
+  border:1px solid var(--line);
+  border-radius:9px;
+  font-size:12px;
+}
+
+.item strong{
+  display:block;
+}
+
+.item small{
+  color:var(--muted);
+  display:block;
+  margin-top:3px;
+}
+
+.item time{
+  color:var(--muted);
+  white-space:nowrap;
+  font-size:11px;
+}
+
+.status{
+  display:inline-block;
+  margin-top:8px;
+  font-size:11px;
+  color:var(--green);
+}
+
+.empty{
+  color:var(--muted);
+  font-size:13px;
+  padding:15px 0;
+}
+
+@media(max-width:700px){
+  .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;
+  }
+
+  .card{
+    padding:15px;
+  }
+
+  h1{
+    font-size:27px;
+  }
+
+  .value{
+    font-size:24px;
+  }
+
+  .chart{
+    gap:5px;
+  }
+
+  .item{
+    align-items:flex-start;
+  }
+
+  .item time{
+    font-size:10px;
+  }
+}
+
+@media(max-width:360px){
+  .container{
+    width:calc(100% - 22px);
+  }
+
+  .value{
+    font-size:21px;
+  }
+}
 </style>
 </head>
+
 <body>
-<header><div class="container"><nav>
-<a class="brand" href="index.html">♟ PuzzleForge</a>
-<div><a href="dashboard.html">Dashboard</a> <a href="library.html">Library</a></div>
-</nav></div></header>
+
+<header>
+  <div class="container">
+    <nav>
+      <a class="brand" href="index.html">♟ PuzzleForge</a>
+
+      <div>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="library.html">Library</a>
+      </div>
+    </nav>
+  </div>
+</header>
 
 <main class="container">
-<h1>Statistics &amp; Performance</h1>
-<p class="muted" id="account">Loading your training data…</p>
 
-<section class="grid">
-<div class="card"><div class="label">Puzzles completed</div><div class="value" id="solved">0</div></div>
-<div class="card"><div class="label">Without hints</div><div class="value" id="noHint">0</div></div>
-<div class="card"><div class="label">Accuracy</div><div class="value" id="accuracy">0%</div></div>
-<div class="card"><div class="label">Current streak</div><div class="value" id="streak">0</div></div>
-</section>
+  <h1>Statistics &amp; Performance</h1>
 
-<section class="card">
-<h2>Daily Puzzle Activity</h2>
-<p class="muted">Puzzles completed over the last seven days.</p>
-<div class="chart" id="dailyChart"></div>
-</section>
+  <p class="muted" id="account">
+    Loading your training data…
+  </p>
 
-<section class="card">
-<h2>Woodpecker Time Progress</h2>
-<p class="muted">Your latest completed rounds. Lower time is better.</p>
-<div class="chart" id="woodChart"></div>
-</section>
+  <span class="status" id="syncStatus">
+    Checking synchronization...
+  </span>
 
-<section class="card">
-<h2>Training History</h2>
-<p class="muted">Recent Puzzle Contriving and Woodpecker activity.</p>
-<div class="history" id="history"><p class="muted">No training records yet.</p></div>
-</section>
+  <!-- PUZZLE ARENA -->
+
+  <h2 class="section-title">Puzzle Arena</h2>
+
+  <section class="grid">
+
+    <div class="card">
+      <div class="label">Puzzles completed</div>
+      <div class="value" id="solved">0</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Without hints</div>
+      <div class="value" id="noHint">0</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Accuracy</div>
+      <div class="value" id="accuracy">0%</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Current streak</div>
+      <div class="value" id="streak">0</div>
+    </div>
+
+  </section>
+
+  <section class="card">
+    <h2>Daily Puzzle Activity</h2>
+    <p class="muted">
+      Puzzles completed over the last seven days.
+    </p>
+    <div class="chart" id="dailyChart"></div>
+  </section>
+
+  <!-- WOODPECKER -->
+
+  <h2 class="section-title">Woodpecker Training</h2>
+
+  <section class="grid">
+
+    <div class="card">
+      <div class="label">Total Rounds</div>
+      <div class="value" id="woodRounds">0</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Total Puzzles</div>
+      <div class="value" id="woodPuzzles">0</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Best Time</div>
+      <div class="value" id="woodBest">--:--</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Fewest Mistakes</div>
+      <div class="value" id="woodMistakes">--</div>
+    </div>
+
+  </section>
+
+  <section class="card">
+    <h2>Woodpecker Time Progress</h2>
+    <p class="muted">
+      Your latest completed rounds. Lower time is better.
+    </p>
+    <div class="chart" id="woodChart"></div>
+  </section>
+
+  <section class="card">
+    <h2>Woodpecker Training History</h2>
+    <p class="muted">
+      Your recently completed Woodpecker rounds.
+    </p>
+    <div class="history" id="woodHistory">
+      <p class="empty">No Woodpecker records yet.</p>
+    </div>
+  </section>
+
+  <!-- COMBINED HISTORY -->
+
+  <h2 class="section-title">Training History</h2>
+
+  <section class="card">
+    <p class="muted">
+      Recent Puzzle Arena and Woodpecker activity.
+    </p>
+
+    <div class="history" id="history">
+      <p class="empty">No training records yet.</p>
+    </div>
+  </section>
+
 </main>
+
+<!-- FIREBASE -->
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-cloud.js"></script>
+
 <script>
 (()=>{
 "use strict";
-const $=id=>document.getElementById(id);
-const PKEY="puzzleforge_progress_v1",WKEY="puzzleforge_woodpecker_v1";
-function read(k){try{return JSON.parse(localStorage.getItem(k)||"{}")}catch(e){return {}}}
-function dk(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
-function fmt(ms){let s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+
+/* ---------------- CONFIGURATION ---------------- */
+
+const $ = id => document.getElementById(id);
+
+const PKEY = "puzzleforge_progress_v1";
+const WKEY = "puzzleforge_woodpecker_v1";
+
+/* ---------------- LOCAL DATA ---------------- */
+
+function read(key){
+  try{
+    const value = JSON.parse(
+      localStorage.getItem(key) || "{}"
+    );
+
+    return value && typeof value === "object"
+      ? value
+      : {};
+
+  }catch(error){
+    console.warn("Statistics read error:",error);
+    return {};
+  }
+}
+
+function number(value){
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function dk(date){
+  return date.getFullYear()+"-"+
+    String(date.getMonth()+1).padStart(2,"0")+"-"+
+    String(date.getDate()).padStart(2,"0");
+}
+
+/* ---------------- TIME FORMAT ---------------- */
+
+function fmt(ms){
+  if(ms === null || ms === undefined ||
+     !Number.isFinite(Number(ms)) || Number(ms)<0){
+    return "--:--";
+  }
+
+  const totalSeconds = Math.floor(Number(ms)/1000);
+
+  const hours = Math.floor(totalSeconds/3600);
+  const minutes = Math.floor((totalSeconds%3600)/60);
+  const seconds = totalSeconds%60;
+
+  if(hours>0){
+    return String(hours).padStart(2,"0")+":"+
+      String(minutes).padStart(2,"0")+":"+
+      String(seconds).padStart(2,"0");
+  }
+
+  return String(minutes).padStart(2,"0")+":"+
+    String(seconds).padStart(2,"0");
+}
+
+/* ---------------- DATE FORMAT ---------------- */
+
+function validDate(value){
+  if(!value) return null;
+
+  const d = new Date(value);
+
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function dateText(value){
+  const d = validDate(value);
+
+  return d
+    ? d.toLocaleDateString()
+    : "Date unavailable";
+}
+
+/* ---------------- STREAK ---------------- */
+
 function streak(dates){
- const set=new Set(Array.isArray(dates)?dates:[]);let d=new Date();d.setHours(0,0,0,0);
- if(!set.has(dk(d)))d.setDate(d.getDate()-1);
- let n=0;while(set.has(dk(d))){n++;d.setDate(d.getDate()-1)}return n;
+
+  const set = new Set(
+    Array.isArray(dates) ? dates : []
+  );
+
+  let d = new Date();
+
+  d.setHours(0,0,0,0);
+
+  if(!set.has(dk(d))){
+    d.setDate(d.getDate()-1);
+  }
+
+  let count = 0;
+
+  while(set.has(dk(d))){
+    count++;
+    d.setDate(d.getDate()-1);
+  }
+
+  return count;
 }
+
+/* ---------------- CHART ---------------- */
+
 function makeChart(container,items,formatter,labeler){
- container.replaceChildren();
- if(!items.length){const p=document.createElement("p");p.className="muted";p.textContent="No data available yet.";container.appendChild(p);return}
- const max=Math.max(1,...items.map(x=>x.value));
- items.forEach((x,i)=>{
-  const col=document.createElement("div");col.className="column";
-  const val=document.createElement("strong");val.textContent=formatter(x.value);
-  const bar=document.createElement("div");bar.className="bar";
-  bar.style.height=Math.max(3,x.value/max*100)+"%";
-  const label=document.createElement("small");label.textContent=labeler(x,i);
-  col.append(val,bar,label);container.appendChild(col);
- });
+
+  container.replaceChildren();
+
+  if(!items.length){
+    const p = document.createElement("p");
+
+    p.className = "empty";
+    p.textContent = "No data available yet.";
+
+    container.appendChild(p);
+    return;
+  }
+
+  const max = Math.max(
+    1,
+    ...items.map(x=>Math.max(0,number(x.value)))
+  );
+
+  items.forEach((item,index)=>{
+
+    const col = document.createElement("div");
+    col.className = "column";
+
+    const val = document.createElement("strong");
+
+    val.textContent = formatter(item.value);
+
+    const barWrap = document.createElement("div");
+    barWrap.className = "bar-wrap";
+
+    const bar = document.createElement("div");
+    bar.className = "bar";
+
+    const percentage = Math.max(
+      0,
+      number(item.value)
+    ) / max * 100;
+
+    bar.style.height = Math.max(
+      2,
+      percentage
+    ) + "%";
+
+    bar.title = formatter(item.value);
+
+    const label = document.createElement("small");
+
+    label.textContent = labeler(item,index);
+
+    barWrap.appendChild(bar);
+
+    col.append(
+      val,
+      barWrap,
+      label
+    );
+
+    container.appendChild(col);
+  });
 }
+
+/* ---------------- PUZZLE ARENA ---------------- */
+
+function renderPuzzleStats(p){
+
+  const solved = Array.isArray(p.solvedIds)
+    ? p.solvedIds.length
+    : 0;
+
+  const noHint = Array.isArray(p.noHintIds)
+    ? p.noHintIds.length
+    : 0;
+
+  const attempts = Math.max(
+    0,
+    number(p.totalAttempts)
+  );
+
+  const correct = Math.max(
+    0,
+    number(p.correctMoves)
+  );
+
+  const accuracy = attempts
+    ? Math.round(correct/attempts*100)
+    : 0;
+
+  $("solved").textContent = solved;
+
+  $("noHint").textContent = noHint;
+
+  $("accuracy").textContent =
+    Math.min(100,accuracy)+"%";
+
+  $("streak").textContent =
+    streak(p.solvedDates);
+
+  /* Daily activity */
+
+  const daily =
+    p.dailySolved &&
+    typeof p.dailySolved === "object" &&
+    !Array.isArray(p.dailySolved)
+      ? p.dailySolved
+      : {};
+
+  const days = [];
+
+  for(let i=6;i>=0;i--){
+
+    const d = new Date();
+
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate()-i);
+
+    const key = dk(d);
+
+    days.push({
+      value: Math.max(
+        0,
+        number(daily[key])
+      ),
+      date: d
+    });
+  }
+
+  /* FIXED: Correct makeChart arguments */
+
+  makeChart(
+    $("dailyChart"),
+    days,
+    value => String(value),
+    item => item.date.toLocaleDateString(
+      undefined,
+      {weekday:"short"}
+    )
+  );
+
+  return daily;
+}
+
+/* ---------------- WOODPECKER ---------------- */
+
+function renderWoodpeckerStats(w){
+
+  const history = Array.isArray(w.history)
+    ? w.history.filter(r=>r && typeof r==="object")
+    : [];
+
+  const stats =
+    w.lifetimeStats &&
+    typeof w.lifetimeStats==="object"
+      ? w.lifetimeStats
+      : {};
+
+  /* Lifetime statistics */
+
+  const rounds = Math.max(
+    0,
+    number(stats.rounds) || history.length
+  );
+
+  const historyPuzzleCount = history.reduce(
+    (sum,r)=>sum+Math.max(0,number(r.count)),
+    0
+  );
+
+  const puzzles = Math.max(
+    0,
+    number(stats.puzzles) || historyPuzzleCount
+  );
+
+  const times = history
+    .map(r=>Number(r.milliseconds))
+    .filter(n=>Number.isFinite(n)&&n>0);
+
+  const storedBest = Number(stats.bestMilliseconds);
+
+  const bestTime =
+    stats.bestMilliseconds!==null &&
+    stats.bestMilliseconds!==undefined &&
+    Number.isFinite(storedBest) &&
+    storedBest>=0
+      ? storedBest
+      : times.length
+        ? Math.min(...times)
+        : null;
+
+  const mistakes = history
+    .map(r=>Number(r.mistakes))
+    .filter(n=>Number.isFinite(n)&&n>=0);
+
+  const storedMistakes = Number(stats.fewestMistakes);
+
+  const fewestMistakes =
+    stats.fewestMistakes!==null &&
+    stats.fewestMistakes!==undefined &&
+    Number.isFinite(storedMistakes) &&
+    storedMistakes>=0
+      ? storedMistakes
+      : mistakes.length
+        ? Math.min(...mistakes)
+        : null;
+
+  $("woodRounds").textContent = rounds;
+
+  $("woodPuzzles").textContent = puzzles;
+
+  $("woodBest").textContent =
+    bestTime===null ? "--:--" : fmt(bestTime);
+
+  $("woodMistakes").textContent =
+    fewestMistakes===null
+      ? "--"
+      : fewestMistakes;
+
+  /* Time progress chart */
+
+  const recent = history
+    .map((r,index)=>({
+      ...r,
+      originalIndex:index
+    }))
+    .filter(r=>
+      Number.isFinite(Number(r.milliseconds)) &&
+      Number(r.milliseconds)>0
+    )
+    .slice(-10);
+
+  makeChart(
+    $("woodChart"),
+
+    recent.map(r=>({
+      value:Number(r.milliseconds),
+      record:r
+    })),
+
+    value=>fmt(value),
+
+    item=>"R"+(item.record.originalIndex+1)
+  );
+
+  /* Woodpecker history */
+
+  const historyBox = $("woodHistory");
+
+  historyBox.replaceChildren();
+
+  if(!history.length){
+
+    const p = document.createElement("p");
+
+    p.className = "empty";
+    p.textContent = "No Woodpecker records yet.";
+
+    historyBox.appendChild(p);
+
+  }else{
+
+    history
+      .slice()
+      .reverse()
+      .slice(0,20)
+      .forEach((r,index)=>{
+
+        const item = document.createElement("div");
+        item.className = "item";
+
+        const left = document.createElement("div");
+
+        const title = document.createElement("strong");
+
+        title.textContent =
+          "Woodpecker Round "+(history.length-index);
+
+        const detail = document.createElement("small");
+
+        detail.textContent =
+          Math.max(0,number(r.count))+
+          " puzzles · "+
+          Math.max(0,number(r.mistakes))+
+          " mistakes · "+
+          (r.time || fmt(number(r.milliseconds)));
+
+        left.append(title,detail);
+
+        const time = document.createElement("time");
+
+        time.textContent = dateText(r.date);
+
+        item.append(left,time);
+
+        historyBox.appendChild(item);
+      });
+  }
+
+  return history;
+}
+
+/* ---------------- COMBINED HISTORY ---------------- */
+
+function renderCombinedHistory(daily,woodHistory){
+
+  const records = [];
+
+  /* Puzzle Arena records */
+
+  Object.entries(daily).forEach(([date,count])=>{
+
+    const total = Math.max(0,number(count));
+
+    if(total<=0) return;
+
+    const d = validDate(date);
+
+    records.push({
+
+      date:d ? d.toLocaleDateString() : date,
+
+      sort:d ? d.getTime() : 0,
+
+      type:"Puzzle Arena",
+
+      detail:total+" puzzles completed"
+
+    });
+  });
+
+  /* Woodpecker records */
+
+  woodHistory.forEach((r,index)=>{
+
+    const d = validDate(r.date);
+
+    records.push({
+
+      date:d ? d.toLocaleDateString() : "Date unavailable",
+
+      sort:d ? d.getTime() : 0,
+
+      type:"Woodpecker Round "+(index+1),
+
+      detail:
+        Math.max(0,number(r.count))+
+        " puzzles · "+
+        Math.max(0,number(r.mistakes))+
+        " mistakes · "+
+        (r.time || fmt(number(r.milliseconds)))
+
+    });
+  });
+
+  /* Latest first */
+
+  records.sort((a,b)=>b.sort-a.sort);
+
+  const box = $("history");
+
+  box.replaceChildren();
+
+  if(!records.length){
+
+    const p = document.createElement("p");
+
+    p.className = "empty";
+    p.textContent = "No training records yet.";
+
+    box.appendChild(p);
+    return;
+  }
+
+  records.slice(0,30).forEach(r=>{
+
+    const item = document.createElement("div");
+
+    item.className = "item";
+
+    const left = document.createElement("div");
+
+    const title = document.createElement("strong");
+
+    title.textContent = r.type;
+
+    const detail = document.createElement("small");
+
+    detail.textContent = r.detail;
+
+    left.append(title,detail);
+
+    const time = document.createElement("time");
+
+    time.textContent = r.date;
+
+    item.append(left,time);
+
+    box.appendChild(item);
+  });
+}
+
+/* ---------------- MAIN RENDER ---------------- */
+
 function render(){
- const p=read(PKEY),w=read(WKEY);
- const solved=Array.isArray(p.solvedIds)?p.solvedIds.length:0;
- const noHint=Array.isArray(p.noHintIds)?p.noHintIds.length:0;
- const attempts=Number(p.totalAttempts)||0,correct=Number(p.correctMoves)||0;
- $("solved").textContent=solved;$("noHint").textContent=noHint;
- $("accuracy").textContent=(attempts?Math.round(correct/attempts*100):0)+"%";
- $("streak").textContent=streak(p.solvedDates);
 
- const daily=p.dailySolved&&typeof p.dailySolved==="object"?p.dailySolved:{};
- const days=[];
- for(let i=6;i>=0;i--){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);days.push({value:Math.max(0,Number(daily[dk(d)])||0),date:d})}
- makeChart($("dailyChart"),days,x=>x,String(x=>x.value),x=>x.date.toLocaleDateString(undefined,{weekday:"short"}));
+  const p = read(PKEY);
 
- const history=Array.isArray(w.history)?w.history:[];
- const recent=history.filter(r=>Number(r.milliseconds)>0).slice(-10);
- makeChart($("woodChart"),recent.map(r=>({value:Number(r.milliseconds),time:r.time})),v=>fmt(v),(x,i)=>"R"+(history.length-recent.length+i+1));
+  const w = read(WKEY);
 
- const records=[];
- Object.entries(daily).forEach(([date,count])=>{
-  if(Number(count)>0)records.push({date,type:"Puzzle Contriving",detail:Number(count)+" puzzles completed",sort:new Date(date).getTime()});
- });
- history.forEach(r=>{
-  const d=r.date?new Date(r.date):null;
-  records.push({date:d&&!isNaN(d)?d.toLocaleDateString():"Date unavailable",type:"Woodpecker Round",detail:(Number(r.count)||0)+" puzzles · "+(Number(r.mistakes)||0)+" mistakes · "+(r.time||"Time unavailable"),sort:d&&!isNaN(d)?d.getTime():0});
- });
- records.sort((a,b)=>b.sort-a.sort);
- const box=$("history");box.replaceChildren();
- if(!records.length){box.textContent="No training records yet."}
- records.slice(0,30).forEach(r=>{
-  const item=document.createElement("div");item.className="item";
-  const left=document.createElement("div"),strong=document.createElement("strong"),small=document.createElement("small");
-  strong.textContent=r.type;small.textContent=r.detail;left.append(strong,small);
-  const time=document.createElement("time");time.textContent=r.date;
-  item.append(left,time);box.appendChild(item);
- });
+  const daily = renderPuzzleStats(p);
+
+  const woodHistory = renderWoodpeckerStats(w);
+
+  renderCombinedHistory(daily,woodHistory);
 }
-window.addEventListener("storage",render);
-window.addEventListener("puzzleforge:cloud-synced",render);
-window.addEventListener("puzzleforge:auth",e=>{
- const u=e.detail?.user??window.PF?.user;
- $("account").textContent=u?"Signed in as "+(u.displayName||u.email):"Browsing as guest";
+
+/* ---------------- ACCOUNT STATUS ---------------- */
+
+function updateAccount(user){
+
+  if(user){
+
+    $("account").textContent =
+      "Signed in as "+(
+        user.displayName ||
+        user.email ||
+        "Google account"
+      );
+
+    $("syncStatus").textContent =
+      "Google account connected";
+
+  }else{
+
+    $("account").textContent =
+      "Browsing as guest · Sign in from Home to sync";
+
+    $("syncStatus").textContent =
+      "Local statistics only";
+  }
+}
+
+/* ---------------- EVENTS ---------------- */
+
+window.addEventListener("storage",event=>{
+
+  if(
+    !event.key ||
+    event.key===PKEY ||
+    event.key===WKEY
+  ){
+    render();
+  }
 });
+
+window.addEventListener(
+  "puzzleforge:cloud-synced",
+  ()=>{
+    render();
+
+    if(window.PF && window.PF.user){
+
+      $("syncStatus").textContent =
+        "Cloud synchronization successful";
+    }
+  }
+);
+
+window.addEventListener(
+  "puzzleforge:auth",
+  event=>{
+
+    const user =
+      event.detail?.user ??
+      window.PF?.user ??
+      null;
+
+    updateAccount(user);
+
+    render();
+  }
+);
+
+window.addEventListener(
+  "puzzleforge:sync-error",
+  event=>{
+
+    console.error(
+      "PuzzleForge synchronization error:",
+      event.detail
+    );
+
+    $("syncStatus").textContent =
+      "Cloud sync failed · Showing locally saved data";
+  }
+);
+
+/* ---------------- INITIALIZATION ---------------- */
+
 async function init(){
- if(window.PF?.authReady)await window.PF.authReady;
- const u=window.PF?.user;
- $("account").textContent=u?"Signed in as "+(u.displayName||u.email):"Browsing as guest · Sign in from Home to sync";
- render();
+
+  render();
+
+  try{
+
+    if(window.PF?.authReady){
+
+      $("account").textContent =
+        "Connecting to your Google account...";
+
+      await window.PF.authReady;
+
+    }
+
+    const user = window.PF?.user || null;
+
+    updateAccount(user);
+
+    /*
+      firebase-cloud.js completes its initial sync
+      before authReady resolves.
+    */
+
+    render();
+
+  }catch(error){
+
+    console.error(
+      "Statistics initialization error:",
+      error
+    );
+
+    $("account").textContent =
+      "Could not verify account status.";
+
+    $("syncStatus").textContent =
+      "Showing available local statistics";
+
+    render();
+  }
 }
-init().catch(console.error);
+
+init();
+
 })();
 </script>
+
 </body>
 </html>
