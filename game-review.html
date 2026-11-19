@@ -204,6 +204,42 @@ height:94%;
 object-fit:contain;
 }
 
+/* Selected move squares */
+.sq.last-from,
+.sq.last-to{
+box-shadow:inset 0 0 0 3px rgba(203,179,106,.9);
+}
+
+/* Move classification icon on destination square */
+.sq-badge{
+position:absolute;
+top:2px;
+right:2px;
+z-index:5;
+width:clamp(15px,2.7vw,25px);
+height:clamp(15px,2.7vw,25px);
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:clamp(10px,2vw,16px);
+font-weight:900;
+line-height:1;
+border:1px solid rgba(255,255,255,.35);
+box-shadow:0 1px 4px rgba(0,0,0,.4);
+pointer-events:none;
+}
+
+.sq-badge.badge-brilliant{background:#174b4a;color:#75e3d9}
+.sq-badge.badge-great{background:#392c59;color:#d0bdff}
+.sq-badge.badge-best{background:#244b35;color:#b5efc3}
+.sq-badge.badge-excellent{background:#244333;color:#a8e4b9}
+.sq-badge.badge-good{background:#303e32;color:#c5e2b5}
+.sq-badge.badge-inaccuracy{background:#514622;color:#ffe18b}
+.sq-badge.badge-mistake{background:#583b24;color:#ffc18d}
+.sq-badge.badge-miss{background:#633d27;color:#ffc18d}
+.sq-badge.badge-blunder{background:#582b32;color:#ffabb2}
+
 .coord{
 position:absolute;
 font-size:9px;
@@ -415,11 +451,9 @@ Choose a source or paste a PGN.
 </p>
 
 <div class="tabs">
-
 <button class="tab active" data-tab="pgn">PGN</button>
 <button class="tab" data-tab="lichess">Lichess</button>
 <button class="tab" data-tab="chesscom">Chess.com</button>
-
 </div>
 
 <div id="pgnTab">
@@ -521,50 +555,15 @@ Your move-by-move performance breakdown.
 
 <div class="category-grid">
 
-<div class="category-stat">
-<small>Brilliant</small>
-<strong id="countBrilliant">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Great</small>
-<strong id="countGreat">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Best</small>
-<strong id="countBest">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Excellent</small>
-<strong id="countExcellent">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Good</small>
-<strong id="countGood">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Inaccuracy</small>
-<strong id="countInaccuracy">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Mistake</small>
-<strong id="countMistake">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Miss</small>
-<strong id="countMiss">0</strong>
-</div>
-
-<div class="category-stat">
-<small>Blunder</small>
-<strong id="countBlunder">0</strong>
-</div>
+<div class="category-stat"><small>Brilliant</small><strong id="countBrilliant">0</strong></div>
+<div class="category-stat"><small>Great</small><strong id="countGreat">0</strong></div>
+<div class="category-stat"><small>Best</small><strong id="countBest">0</strong></div>
+<div class="category-stat"><small>Excellent</small><strong id="countExcellent">0</strong></div>
+<div class="category-stat"><small>Good</small><strong id="countGood">0</strong></div>
+<div class="category-stat"><small>Inaccuracy</small><strong id="countInaccuracy">0</strong></div>
+<div class="category-stat"><small>Mistake</small><strong id="countMistake">0</strong></div>
+<div class="category-stat"><small>Miss</small><strong id="countMiss">0</strong></div>
+<div class="category-stat"><small>Blunder</small><strong id="countBlunder">0</strong></div>
 
 </div>
 </div>
@@ -680,24 +679,25 @@ const $=id=>document.getElementById(id);
 const START="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 const CLASSIFICATIONS=[
-"Brilliant",
-"Great",
-"Best",
-"Excellent",
-"Good",
-"Inaccuracy",
-"Mistake",
-"Miss",
-"Blunder"
+"Brilliant","Great","Best","Excellent","Good",
+"Inaccuracy","Mistake","Miss","Blunder"
 ];
 
 const MATERIAL={
-p:1,
-n:3,
-b:3,
-r:5,
-q:9,
-k:0
+p:1,n:3,b:3,r:5,q:9,k:0
+};
+
+/* Icons shown on the destination square */
+const CLASSIFICATION_ICONS={
+Brilliant:"✦",
+Great:"★",
+Best:"✓",
+Excellent:"◆",
+Good:"●",
+Inaccuracy:"!",
+Mistake:"?",
+Miss:"⊘",
+Blunder:"✕"
 };
 
 let games=[];
@@ -711,6 +711,8 @@ let activeResolve=null;
 let activeScore=null;
 let analysisBusy=false;
 let latestAnalysis=0;
+
+/* ---------------- STATUS ---------------- */
 
 function message(t,error=false){
 $("importStatus").textContent=t;
@@ -995,8 +997,7 @@ resolve();
 
 }
 
-/* Stockfish score is relative to the side to move.
-   Convert it to White's perspective. */
+/* Convert Stockfish score to White's perspective. */
 
 if(s.startsWith("info ") && activeResolve){
 
@@ -1034,10 +1035,8 @@ const done=activeResolve;
 activeResolve=null;
 
 done({
-
 score:activeScore,
 bestMove:s.split(/\s+/)[1]
-
 });
 
 }
@@ -1156,14 +1155,6 @@ return 0;
 
 }
 
-/*
-  Detects a sound piece sacrifice.
-
-  The played move must be the engine's best move.
-  The opponent's best reply must capture the moved piece.
-  The captured piece must have meaningful material value.
-*/
-
 function isSoundSacrifice(position,afterAnalysis,loss,isBest){
 
 if(!isBest)return false;
@@ -1206,16 +1197,6 @@ return false;
 
 }
 
-/*
-  Classification order:
-
-  Brilliant: sound sacrifice confirmed by the engine.
-  Great: best move in a forced/very restricted position.
-  Best: engine's top move.
-  Miss: misses a significant winning advantage.
-  Remaining categories use evaluation loss.
-*/
-
 function classify(position,loss,isBest,afterAnalysis){
 
 const legalCount=getLegalMoveCount(position.before);
@@ -1232,16 +1213,13 @@ if(
 isBest &&
 (
 legalCount===1 ||
-(position.san.includes("#"))
+position.san.includes("#")
 )
 )
 return "Great";
 
 if(isBest)
 return "Best";
-
-/* Miss: the player had a clear winning advantage,
-   but the move gives away a substantial part of it. */
 
 if(
 moverBefore>=2.0 &&
@@ -1251,11 +1229,8 @@ loss<1.5
 return "Miss";
 
 if(loss<0.08)return "Excellent";
-
 if(loss<0.18)return "Good";
-
 if(loss<0.35)return "Inaccuracy";
-
 if(loss<0.75)return "Mistake";
 
 return "Blunder";
@@ -1297,6 +1272,7 @@ cursor=0;
 renderSummary();
 renderMoves();
 renderGraph();
+renderMove(0);
 
 $("analysisProgress").textContent="Starting engine...";
 
@@ -1321,8 +1297,6 @@ const bestSan=before.bestMove
 const after=await analyzeFen(p.after,depth);
 
 if(run!==latestAnalysis)break;
-
-/* Both evaluations are converted to White's perspective. */
 
 const loss=p.color==="w"
 ?before.score-after.score
@@ -1367,6 +1341,9 @@ renderSummary();
 renderMoves();
 renderGraph();
 
+/* Keep the currently selected board updated during analysis. */
+if(cursor>0)renderMove(cursor);
+
 }
 
 if(run===latestAnalysis){
@@ -1410,10 +1387,7 @@ $("whiteAccuracy").textContent=accuracy("w");
 $("blackAccuracy").textContent=accuracy("b");
 
 const errors=[
-"Inaccuracy",
-"Mistake",
-"Miss",
-"Blunder"
+"Inaccuracy","Mistake","Miss","Blunder"
 ];
 
 $("whiteErrors").textContent=
@@ -1498,7 +1472,12 @@ pts.map(p=>p.x+","+p.y).join(" ")
 
 /* ---------------- BOARD ---------------- */
 
-function renderBoard(fen){
+/*
+  The board is rendered after the selected move.
+  The classification icon is placed on the destination square.
+*/
+
+function renderBoard(fen,move=null){
 
 const g=new Chess(fen);
 
@@ -1508,6 +1487,16 @@ const el=$("board");
 
 el.innerHTML="";
 
+let fromSquare=null;
+let toSquare=null;
+
+if(move && move.uci){
+
+fromSquare=move.uci.slice(0,2);
+toSquare=move.uci.slice(2,4);
+
+}
+
 board.forEach((rank,r)=>{
 
 rank.forEach((piece,c)=>{
@@ -1515,6 +1504,18 @@ rank.forEach((piece,c)=>{
 const s=document.createElement("div");
 
 s.className="sq "+((r+c)%2?"dark":"light");
+
+const file="abcdefgh"[c];
+const rankNumber=8-r;
+const squareName=file+rankNumber;
+
+/* Highlight the selected move's origin and destination. */
+
+if(squareName===fromSquare)
+s.classList.add("last-from");
+
+if(squareName===toSquare)
+s.classList.add("last-to");
 
 if(piece){
 
@@ -1528,6 +1529,29 @@ piece.type.toUpperCase()+
 img.alt=piece.color+" "+piece.type;
 
 s.appendChild(img);
+
+}
+
+/* Add classification icon to the destination square. */
+
+if(
+move &&
+squareName===toSquare &&
+move.classification
+){
+
+const badge=document.createElement("span");
+
+badge.className=
+"sq-badge badge-"+
+move.classification.toLowerCase();
+
+badge.textContent=
+CLASSIFICATION_ICONS[move.classification]||"•";
+
+badge.title=move.classification;
+
+s.appendChild(badge);
 
 }
 
@@ -1552,7 +1576,7 @@ q.className="coord";
 q.style.top="auto";
 q.style.bottom="2px";
 
-q.textContent="abcdefgh"[c];
+q.textContent=file;
 
 s.appendChild(q);
 
@@ -1579,9 +1603,10 @@ const fen=cursor===0
 ?current.startFen
 :current.plies[cursor-1].after;
 
-renderBoard(fen);
-
 const m=cursor?results[cursor-1]:null;
+
+/* Pass selected move information to the board renderer. */
+renderBoard(fen,m);
 
 const evalv=m?m.afterScore:0;
 
@@ -1620,7 +1645,9 @@ badge.className=
 "classification-badge badge-"+
 m.classification.toLowerCase();
 
-badge.textContent=m.classification;
+badge.textContent=
+(CLASSIFICATION_ICONS[m.classification]||"")+
+" "+m.classification;
 
 const played=document.createElement("p");
 
