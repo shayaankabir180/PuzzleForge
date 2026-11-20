@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,7 +43,11 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 .dark{background:#b58863;color:#171717}
 .sq img{width:82%;height:82%;object-fit:contain;display:block;filter:contrast(1.18) saturate(1.04);transform:translateZ(0)}
 .sq.last-from,.sq.last-to{box-shadow:inset 0 0 0 3px rgba(203,179,106,.9)}
-.sq-badge{position:absolute;top:2px;right:2px;z-index:5;width:clamp(15px,2.7vw,25px);height:clamp(15px,2.7vw,25px);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(10px,2vw,16px);font-weight:900;border:1px solid rgba(255,255,255,.35);box-shadow:0 1px 4px rgba(0,0,0,.4);pointer-events:none}
+.sq-badge{position:absolute;top:2px;right:2px;z-index:5;width:clamp(17px,2.9vw,27px);height:clamp(17px,2.9vw,27px);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(10px,2vw,16px);font-weight:900;border:1px solid rgba(255,255,255,.35);box-shadow:0 1px 4px rgba(0,0,0,.4);pointer-events:none}
+.sq-badge.engine{background:#087e75;color:#fff}
+.sq-badge.good{background:#278348;color:#fff}
+.sq-badge.bad{background:#b77a13;color:#fff}
+.sq-badge.chaos{background:#c02e43;color:#fff}
 .coord{position:absolute;z-index:4;font-size:clamp(8px,1.45vw,10px);font-weight:800;line-height:1;padding:0;margin:0;border:0;background:transparent;opacity:.9;pointer-events:none}
 .coord.rank{left:3px;top:3px}
 .coord.file{right:3px;bottom:3px}
@@ -54,17 +57,23 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 .evalbar{height:13px;background:#fff;border-radius:5px;overflow:hidden;margin:9px 0}
 .evalwhite{height:100%;background:#171b24;width:50%;transition:width .2s}
 .evaltext{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
-.probability-line{display:flex;justify-content:space-between;gap:5px;font-size:11px;color:var(--muted);margin-top:5px}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:12px 0}
 .stat,.category-stat{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px;min-width:0}
 .stat small,.category-stat small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px}
 .stat strong{font-size:24px;display:block;margin-top:3px}
-.category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
-.category-stat strong{font-size:21px}
+.category-players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.player-category-box{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px;min-width:0}
+.player-category-box h3{font-size:14px;margin:0 0 10px}
+.category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.category-stat strong{font-size:21px;display:block;margin-top:3px}
+.category-stat.engine-count{border-color:#176b65}
+.category-stat.good-count{border-color:#326d45}
+.category-stat.bad-count{border-color:#806222}
+.category-stat.chaos-count{border-color:#803541}
 .moves{display:flex;flex-wrap:wrap;gap:5px;max-height:250px;overflow:auto;margin-top:10px}
 .move{border:1px solid transparent;background:#10141d;color:#ddd;border-radius:5px;padding:5px 7px;font-size:12px;cursor:pointer}
 .move.current{border-color:var(--gold);background:#302a1b;color:#fff}
-.move.bad{color:#ed9a9a}
+.move.bad{color:#edc66d}
 .move.good{color:#a8d5b2}
 .move.engine{color:#65d9d0}
 .move.chaos{color:#f19ba2}
@@ -75,10 +84,6 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 .badge-good{background:#244333;color:#9cdbad}
 .badge-bad{background:#514622;color:#ead17c}
 .badge-chaos{background:#582b32;color:#f19ba2}
-.prob-card{background:#10141d;border:1px solid var(--line);border-radius:9px;padding:12px;margin-top:10px}
-.prob-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin:5px 0}
-.prob-track{height:8px;background:#303744;border-radius:8px;overflow:hidden;margin:5px 0}
-.prob-fill{height:100%;background:var(--gold);border-radius:8px}
 .section-note,.rating-note{font-size:11px;color:var(--muted);line-height:1.6}
 .phase-bar{height:8px;background:#303744;border-radius:8px;overflow:hidden;margin-top:6px}
 .phase-fill{height:100%;background:var(--green);border-radius:8px}
@@ -90,7 +95,6 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 .advanced-item{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px}
 .advanced-item small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}
 .advanced-item strong{font-size:18px}
-.confidence{display:inline-block;border:1px solid var(--line);border-radius:5px;padding:3px 7px;font-size:10px;color:var(--muted);margin-top:5px}
 .rating-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
 .phase-side{margin-top:15px}
 .phase-side h3{font-size:13px;margin:0 0 7px}
@@ -100,8 +104,16 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 .impact{border-left:3px solid var(--gold);padding:8px 11px;margin:10px 0;background:#171b24;border-radius:0 7px 7px 0}
 .impact.danger{border-color:var(--red)}
 .impact.good{border-color:var(--green)}
-@media(max-width:800px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{margin-top:20px}}
-@media(max-width:380px){.stats{grid-template-columns:repeat(2,1fr)}.phase-row{grid-template-columns:85px 1fr 45px}}
+@media(max-width:800px){
+.grid{grid-template-columns:1fr}
+.stats{grid-template-columns:repeat(2,1fr)}
+.category-players{grid-template-columns:1fr}
+.wrap{margin-top:20px}
+}
+@media(max-width:380px){
+.stats{grid-template-columns:repeat(2,1fr)}
+.phase-row{grid-template-columns:85px 1fr 45px}
+}
 </style>
 </head>
 
@@ -118,7 +130,7 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <main class="wrap">
 <div class="eyebrow">PUZZLEFORGE · PROPRIETARY REVIEW ENGINE</div>
 <h1>Game Review</h1>
-<p class="muted">Engine-assisted analysis, expected-points review, performance insights and practical learning.</p>
+<p class="muted">Engine-assisted analysis, performance insights and practical learning.</p>
 
 <section class="panel">
 <h2>Import a game</h2>
@@ -126,7 +138,6 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <div class="tabs">
 <button class="tab active" data-tab="pgn">PGN</button>
 <button class="tab" data-tab="lichess">Lichess</button>
-<button class="tab" data-tab="chesscom">Chess.com</button>
 </div>
 <div id="pgnTab">
 <label>Paste PGN</label>
@@ -146,13 +157,6 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <button class="btn primary" id="fetchLichess">Fetch Games</button>
 </div>
 </div>
-<div id="chesscomTab" class="hide">
-<label>Chess.com username</label>
-<div class="row">
-<input id="chesscomUser" placeholder="Username">
-<button class="btn primary" id="fetchChesscom">Fetch Games</button>
-</div>
-</div>
 <div id="gamePickerWrap" class="hide">
 <label>Select game</label>
 <select id="gamePicker"></select>
@@ -164,8 +168,8 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <section id="reviewSection" class="hide">
 
 <div class="stats">
-<div class="stat"><small>Performance Estimate · White</small><strong id="whiteRating">—</strong><span class="confidence" id="whiteConfidence">Awaiting analysis</span></div>
-<div class="stat"><small>Performance Estimate · Black</small><strong id="blackRating">—</strong><span class="confidence" id="blackConfidence">Awaiting analysis</span></div>
+<div class="stat"><small>Estimated Rating · White</small><strong id="whiteRating">—</strong></div>
+<div class="stat"><small>Estimated Rating · Black</small><strong id="blackRating">—</strong></div>
 <div class="stat"><small>Overall Accuracy · White</small><strong id="whiteAccuracy">—</strong></div>
 <div class="stat"><small>Overall Accuracy · Black</small><strong id="blackAccuracy">—</strong></div>
 <div class="stat"><small>Average CPL · White</small><strong id="whiteCPL">—</strong></div>
@@ -182,7 +186,7 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <button class="btn" id="updateRatings" style="margin-top:9px">Update rating estimate</button>
 </div>
 
-<p class="rating-note">Accuracy uses an engine-based expected-score-loss model inspired by public CAPS2 concepts. Chess.com's exact proprietary formula is not public. Performance estimates are approximate and should not be treated as official Elo.</p>
+<p class="rating-note">Accuracy is an engine-based expected-score-loss estimate. Performance estimates are approximate and should not be treated as official Elo.</p>
 
 <div class="category-panel">
 <h2>Phase-wise Accuracy</h2>
@@ -192,16 +196,28 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 
 <div class="category-panel">
 <h2>Move Classification</h2>
-<p class="section-note">Four categories, counted separately for each player. Chaos is reserved for exceptionally severe blunders.</p>
+<p class="section-note">Move counts are displayed separately for each player.</p>
+
+<div class="category-players">
+<div class="player-category-box">
+<h3>♔ White</h3>
 <div class="category-grid">
-<div class="category-stat"><small>Engine · White</small><strong id="whiteEngineCount">0</strong></div>
-<div class="category-stat"><small>Good · White</small><strong id="whiteGoodCount">0</strong></div>
-<div class="category-stat"><small>Bad · White</small><strong id="whiteBadCount">0</strong></div>
-<div class="category-stat"><small>Chaos · White</small><strong id="whiteChaosCount">0</strong></div>
-<div class="category-stat"><small>Engine · Black</small><strong id="blackEngineCount">0</strong></div>
-<div class="category-stat"><small>Good · Black</small><strong id="blackGoodCount">0</strong></div>
-<div class="category-stat"><small>Bad · Black</small><strong id="blackBadCount">0</strong></div>
-<div class="category-stat"><small>Chaos · Black</small><strong id="blackChaosCount">0</strong></div>
+<div class="category-stat engine-count"><small>Engine Move !</small><strong id="whiteEngineCount">0</strong></div>
+<div class="category-stat good-count"><small>Good Move ✓</small><strong id="whiteGoodCount">0</strong></div>
+<div class="category-stat bad-count"><small>Bad Move !?</small><strong id="whiteBadCount">0</strong></div>
+<div class="category-stat chaos-count"><small>Chaos ×</small><strong id="whiteChaosCount">0</strong></div>
+</div>
+</div>
+
+<div class="player-category-box">
+<h3>♚ Black</h3>
+<div class="category-grid">
+<div class="category-stat engine-count"><small>Engine Move !</small><strong id="blackEngineCount">0</strong></div>
+<div class="category-stat good-count"><small>Good Move ✓</small><strong id="blackGoodCount">0</strong></div>
+<div class="category-stat bad-count"><small>Bad Move !?</small><strong id="blackBadCount">0</strong></div>
+<div class="category-stat chaos-count"><small>Chaos ×</small><strong id="blackChaosCount">0</strong></div>
+</div>
+</div>
 </div>
 </div>
 
@@ -214,11 +230,7 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 </div>
 <div class="evalbar"><div class="evalwhite" id="evalWhite"></div></div>
 <div class="evaltext"><span id="evalScore">0.0</span><span id="moveCount">Start</span></div>
-<div class="probability-line">
-<span id="whiteProb">White: 33%</span>
-<span id="drawProb">Draw: 34%</span>
-<span id="blackProb">Black: 33%</span>
-</div>
+
 <div class="board-wrap">
 <div class="board" id="board"></div>
 <svg class="arrow-layer" id="arrowLayer" viewBox="0 0 800 800">
@@ -281,7 +293,6 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <option value="18">Depth 18 · Deep (slower)</option>
 </select>
 <div id="analysisProgress" class="status"></div>
-<p class="section-note">Requires engine/stockfish-19-lite-single.js and its matching engine assets in your repository.</p>
 </div>
 </section>
 </main>
@@ -291,12 +302,12 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 
 const $=id=>document.getElementById(id);
 const MATERIAL={p:1,n:3,b:3,r:5,q:9,k:0};
-const ICONS={"Engine Move":"✓","Good Move":"●","Bad Move":"!","Chaos":"✕"};
+const ICONS={"Engine Move":"!","Good Move":"✓","Bad Move":"!?","Chaos":"×"};
 const CLASSES={"Engine Move":"engine","Good Move":"good","Bad Move":"bad","Chaos":"chaos"};
 
 let games=[],current=null,results=[],cursor=0;
 let worker=null,readyPromise=null,activeResolve=null;
-let activeScore=null,activeWDL=null,activeDepth=-1,activeTurn="w",activePV=[];
+let activeScore=null,activeWDL=null,activeDepth=-1,activeTurn="w",activePV=[],activeMate=null;
 let analysisBusy=false,latestAnalysis=0,engineFailed=false;
 
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -386,7 +397,7 @@ message(games.length+" game(s) loaded.");
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
 document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
 b.classList.add("active");
-["pgn","lichess","chesscom"].forEach(n=>
+["pgn","lichess"].forEach(n=>
 $(n+"Tab").classList.toggle("hide",n!==b.dataset.tab));
 });
 
@@ -410,25 +421,6 @@ try{
 const r=await fetch("https://lichess.org/api/games/user/"+encodeURIComponent(u)+"?max=15&moves=true",{headers:{Accept:"application/x-chess-pgn"}});
 if(!r.ok)throw Error("Lichess error: "+r.status);
 loadText(await r.text());
-}catch(e){message(e.message,true);}
-};
-
-$("fetchChesscom").onclick=async()=>{
-const u=$("chesscomUser").value.trim();
-if(!u)return message("Enter username.",true);
-message("Fetching Chess.com games...");
-try{
-const a=await fetch("https://api.chess.com/pub/player/"+encodeURIComponent(u)+"/games/archives");
-if(!a.ok)throw Error("Chess.com error: "+a.status);
-const data=await a.json(),urls=(data.archives||[]).slice(-3).reverse();
-if(!urls.length)throw Error("No public archives found.");
-const chunks=[];
-for(const url of urls){
-const r=await fetch(url+"/pgn");
-if(r.ok){const t=await r.text();if(t.trim())chunks.push(t);}
-}
-if(!chunks.length)throw Error("No PGN games available.");
-loadText(chunks.join("\n"));
 }catch(e){message(e.message,true);}
 };
 
@@ -487,6 +479,7 @@ const sm=s.match(/\bscore (cp|mate) (-?\d+)/);
 if(sm&&dep>=activeDepth){
 activeDepth=dep;
 const v=+sm[2];
+activeMate=sm[1]==="mate"?v:null;
 const cp=sm[1]==="mate"
 ?(v>=0?10000-Math.min(999,Math.abs(v)):-10000+Math.min(999,Math.abs(v)))
 :v/100;
@@ -509,7 +502,8 @@ score:activeScore??0,
 wdl:activeWDL,
 sideToMove:activeTurn,
 bestMove:s.split(/\s+/)[1]||"(none)",
-pv:activePV.slice()
+pv:activePV.slice(),
+mate:activeMate
 });
 }
 };
@@ -529,6 +523,7 @@ activeScore=null;
 activeWDL=null;
 activeDepth=-1;
 activePV=[];
+activeMate=null;
 activeTurn=fen.split(" ")[1]||"w";
 
 let done=false;
@@ -595,23 +590,6 @@ if(q===0&&mat<=13)return"Endgame";
 return"Middlegame";
 }
 
-/*
-CLASSIFICATION
-
-Chaos:
-Very severe expected-points loss plus major centipawn loss,
-or a forced mate-level disaster.
-
-Bad Move:
-Significant loss, but not a near-decisive catastrophe.
-
-Good Move:
-Small or moderate loss.
-
-Engine Move:
-The engine's top move.
-*/
-
 function classify(isBest,loss,cpl,afterScore,afterMate){
 if(isBest)return"Engine Move";
 
@@ -626,12 +604,6 @@ if(loss>=.055||cpl>=85)return"Bad Move";
 
 return"Good Move";
 }
-
-/*
-Expected-score-loss based accuracy.
-This is a transparent CAPS2-inspired approximation,
-not Chess.com's private implementation.
-*/
 
 function moveAccuracy(loss,cpl){
 const l=clamp(Number(loss)||0,0,1);
@@ -657,23 +629,14 @@ if(result==="1/2-1/2")return .5;
 return null;
 }
 
-/*
-Performance estimate:
-Uses the opponent's known rating as a baseline where available.
-Game result is blended with engine-derived accuracy.
-It is an estimate, not official Elo.
-*/
-
 function performance(list,color){
-if(list.length<4)return{rating:null,confidence:"Insufficient moves"};
+if(list.length<4)return{rating:null};
 
 const own=Number($(color==="w"?"whiteBaseRating":"blackBaseRating").value)||null;
 const opponent=Number($(color==="w"?"blackBaseRating":"whiteBaseRating").value)||null;
 const a=accuracy(list);
 
-if(!own&&!opponent){
-return{rating:null,confidence:"Add player ratings for estimate"};
-}
+if(!own&&!opponent)return{rating:null};
 
 const result=gameResultScore(color);
 const quality=clamp(.5+(a-70)/100,.08,.92);
@@ -689,10 +652,7 @@ const delta=(a-70)*8+(result===null?0:(result-.5)*100);
 rating=Math.round(clamp(own+delta,100,4000)/25)*25;
 }
 
-return{
-rating,
-confidence:list.length>=40?"Moderate confidence":list.length>=20?"Low confidence":"Very low confidence"
-};
+return{rating};
 }
 
 function pct(v){return v===null?"—":v.toFixed(1)+"%";}
@@ -754,8 +714,6 @@ $("blackCPL").textContent=bc===null?"—":bc.toFixed(1)+" cp";
 
 $("whiteRating").textContent=wr.rating??"—";
 $("blackRating").textContent=br.rating??"—";
-$("whiteConfidence").textContent=wr.confidence;
-$("blackConfidence").textContent=br.confidence;
 
 [
 ["Engine Move","Engine"],
@@ -856,7 +814,7 @@ s.appendChild(img);
 
 if(m&&sq===to){
 const badge=document.createElement("span");
-badge.className="sq-badge";
+badge.className="sq-badge "+categoryClass(m.classification);
 badge.textContent=ICONS[m.classification]||"•";
 badge.title=m.classification;
 s.appendChild(badge);
@@ -882,9 +840,6 @@ el.appendChild(s);
 
 function renderProbability(cp,wdl,sideToMove="w"){
 const p=normalizedWDL(cp,wdl,sideToMove);
-$("whiteProb").textContent="White: "+(p.whiteWin*100).toFixed(1)+"%";
-$("drawProb").textContent="Draw: "+(p.draw*100).toFixed(1)+"%";
-$("blackProb").textContent="Black: "+(p.blackWin*100).toFixed(1)+"%";
 $("evalWhite").style.width=((p.whiteWin+p.draw/2)*100)+"%";
 }
 
@@ -945,19 +900,15 @@ return"No major immediate material loss is detected in the first opponent reply.
 }
 
 function explanation(m){
-let s="";
-
 if(m.classification==="Engine Move"){
-s="You played Stockfish's top-ranked move at the selected search depth.";
+return"You played Stockfish's top-ranked move at the selected search depth.";
 }else if(m.classification==="Good Move"){
-s="This move keeps the position relatively close to the engine's preferred continuation.";
+return"This move keeps the position relatively close to the engine's preferred continuation.";
 }else if(m.classification==="Bad Move"){
-s="This move gives the opponent a significant opportunity to improve their position.";
+return"This move gives the opponent a significant opportunity to improve their position.";
 }else{
-s="This is a severe mistake. The move allows a major deterioration in the position and may leave the game close to a decisive result.";
+return"This is a severe mistake. The move allows a major deterioration in the position and may leave the game close to a decisive result.";
 }
-
-return s;
 }
 
 function renderMove(ply){
@@ -1029,33 +980,6 @@ addLine(d,"Evaluation After",(m.afterScore>0?"+":"")+m.afterScore.toFixed(2));
 
 $("moveDetail").appendChild(d);
 
-const card=document.createElement("div");
-card.className="prob-card";
-
-const h=document.createElement("strong");
-h.textContent="Expected Result After Move";
-card.appendChild(h);
-
-[["Win",m.afterWDL.win],["Draw",m.afterWDL.draw],["Loss",m.afterWDL.loss]].forEach(([n,v])=>{
-const row=document.createElement("div");
-row.className="prob-row";
-const a=document.createElement("span");
-const b=document.createElement("strong");
-a.textContent=n;
-b.textContent=(v*100).toFixed(1)+"%";
-row.append(a,b);
-
-const track=document.createElement("div");
-track.className="prob-track";
-const fill=document.createElement("div");
-fill.className="prob-fill";
-fill.style.width=v*100+"%";
-track.appendChild(fill);
-card.append(row,track);
-});
-
-$("moveDetail").appendChild(card);
-
 }else{
 $("reviewHeading").textContent="Starting Position";
 $("moveDetail").textContent="Starting position. Analyse the game to see move classifications, estimated rating and engine recommendations.";
@@ -1108,15 +1032,8 @@ for(let i=0;i<current.plies.length;i++){
 if(run!==latestAnalysis)break;
 
 const p=current.plies[i];
-
 const bestUci=before.bestMove;
 const bestSan=sanFromUci(p.before,bestUci);
-
-/*
-Analyse the position after the played move.
-This is the opponent's turn.
-Its bestMove is the opponent's strongest response.
-*/
 
 const after=await analyzeFen(p.after,depth);
 if(run!==latestAnalysis)break;
@@ -1130,7 +1047,6 @@ const ap=p.color==="w"?after.score:-after.score;
 const cpl=clamp((bp-ap)*100,0,10000);
 
 const isBest=!!bestUci&&p.uci.toLowerCase()===bestUci.toLowerCase();
-
 const phase=phaseOf(p.before,p.number);
 
 const replySan=sanFromUci(p.after,after.bestMove);
@@ -1208,12 +1124,7 @@ depth
 }catch(e){}
 
 $("analysisProgress").textContent="Analysis complete.";
-
-const source=results.some(m=>m.afterWDLRaw)
-?"Stockfish WDL where reported; fallback model otherwise"
-:"Fallback expected-points model";
-
-$("engineStatus").textContent="Stockfish analysis completed · "+source;
+$("engineStatus").textContent="Stockfish analysis completed";
 
 renderSummary();
 renderMoves();
@@ -1259,9 +1170,6 @@ resetRatingFields(game);
 "whiteAccuracy","blackAccuracy",
 "whiteCPL","blackCPL"
 ].forEach(id=>$(id).textContent="—");
-
-$("whiteConfidence").textContent=
-$("blackConfidence").textContent="Awaiting analysis";
 
 renderSummary();
 renderMoves();
