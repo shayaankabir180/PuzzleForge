@@ -105,6 +105,9 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 .impact{border-left:3px solid var(--gold);padding:8px 11px;margin:10px 0;background:#171b24;border-radius:0 7px 7px 0}
 .impact.danger{border-color:var(--red)}
 .impact.good{border-color:var(--green)}
+.tactical-heading{color:var(--gold);font-weight:800;margin-top:12px}
+.tactical-list{padding-left:19px;margin:7px 0}
+.tactical-list li{margin:5px 0}
 @media(max-width:800px){
 .grid{grid-template-columns:1fr}
 .stats{grid-template-columns:repeat(2,1fr)}
@@ -159,7 +162,7 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <label>Chess.com username</label>
 <div class="row">
 <input id="chesscomUser" placeholder="Enter Chess.com username">
-<button class="btn primary" id="fetchChessCom">Fetch 105 Games</button>
+<button class="btn primary" id="fetchChessCom">Fetch</button>
 </div>
 <p class="section-note">Fetches your latest 105 public games from Chess.com.</p>
 </div>
@@ -168,7 +171,7 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <label>Lichess username</label>
 <div class="row">
 <input id="lichessUser" placeholder="Username">
-<button class="btn primary" id="fetchLichess">Fetch 105 Games</button>
+<button class="btn primary" id="fetchLichess">Fetch</button>
 </div>
 <p class="section-note">Fetches your latest 105 public games from Lichess.</p>
 </div>
@@ -319,6 +322,7 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 
 const $=id=>document.getElementById(id);
 const MATERIAL={p:1,n:3,b:3,r:5,q:9,k:0};
+const PIECE_NAMES={p:"pawn",n:"knight",b:"bishop",r:"rook",q:"queen",k:"king"};
 const ICONS={"Engine Move":"!","Good Move":"✓","Bad Move":"!?","Chaos":"×"};
 const CLASSES={"Engine Move":"engine","Good Move":"good","Bad Move":"bad","Chaos":"chaos"};
 
@@ -427,11 +431,6 @@ const f=e.target.files[0];
 if(f){$("pgnInput").value=await f.text();loadText($("pgnInput").value);}
 };
 
-$("useSelected").onclick=()=>{
-const i=Number($("gamePicker").value),g=games[i];
-if(g){localStorage.setItem("pf_review_game_index",String(i));startGame(g.game);}
-};
-
 /* CHESS.COM - FETCH LATEST 105 GAMES */
 
 $("fetchChessCom").onclick=async()=>{
@@ -445,10 +444,9 @@ return message("Invalid Chess.com username.",true);
 
 const btn=$("fetchChessCom");
 btn.disabled=true;
-btn.textContent="Fetching...";
 
 try{
-message("Checking Chess.com username...");
+message("");
 
 const base="https://api.chess.com/pub/player/"+encodeURIComponent(username);
 
@@ -469,8 +467,6 @@ if(!profile.username||profile.username.toLowerCase()!==username.toLowerCase()){
 throw Error("Username verification failed.");
 }
 
-message("Loading Chess.com game archives...");
-
 const archiveResponse=await fetch(base+"/games/archives",{
 headers:{"Accept":"application/json"}
 });
@@ -490,11 +486,6 @@ let allGames=[];
 
 for(let i=0;i<archives.length;i++){
 if(allGames.length>=105)break;
-
-message(
-"Fetching Chess.com archive "+(i+1)+" / "+archives.length+
-" · "+allGames.length+" games collected..."
-);
 
 const response=await fetch(archives[i],{
 headers:{"Accept":"application/json"}
@@ -528,10 +519,8 @@ loadText(combinedPGN);
 
 if(games.length){
 $("gamePicker").selectedIndex=0;
-message(
-"Successfully fetched "+games.length+
-" latest Chess.com game(s). Select a game to review."
-);
+message("Successfully fetched "+games.length+
+" latest Chess.com game(s). Select a game to review.");
 }
 
 }catch(e){
@@ -539,7 +528,6 @@ console.error("Chess.com import error:",e);
 message("Chess.com import failed: "+e.message,true);
 }finally{
 btn.disabled=false;
-btn.textContent="Fetch 105 Games";
 }
 };
 
@@ -552,10 +540,9 @@ if(!username)return message("Enter Lichess username.",true);
 
 const btn=$("fetchLichess");
 btn.disabled=true;
-btn.textContent="Fetching...";
 
 try{
-message("Fetching your latest 105 Lichess games...");
+message("");
 
 const url=
 "https://lichess.org/api/games/user/"+
@@ -587,10 +574,8 @@ loadText(pgn);
 
 if(games.length){
 $("gamePicker").selectedIndex=0;
-message(
-"Successfully fetched "+games.length+
-" latest Lichess game(s). Select a game to review."
-);
+message("Successfully fetched "+games.length+
+" latest Lichess game(s). Select a game to review.");
 }
 
 }catch(e){
@@ -598,7 +583,6 @@ console.error("Lichess import error:",e);
 message("Lichess import failed: "+e.message,true);
 }finally{
 btn.disabled=false;
-btn.textContent="Fetch 105 Games";
 }
 };
 
@@ -738,7 +722,7 @@ return m?m.san:uci;
 }catch{return uci;}
 }
 
-function convertPV(fen,pv,max=6){
+function convertPV(fen,pv,max=8){
 const g=new Chess(fen),out=[];
 for(const u of (pv||[]).slice(0,max)){
 try{
@@ -748,7 +732,17 @@ to:u.slice(2,4),
 promotion:u[4]||"q"
 });
 if(!m)break;
-out.push(m.san);
+out.push({
+san:m.san,
+uci:u,
+from:m.from,
+to:m.to,
+color:m.color,
+captured:m.captured||null,
+piece:m.piece,
+check:m.san.includes("+")||m.san.includes("#"),
+mate:m.san.includes("#")
+});
 }catch{break;}
 }
 return out;
@@ -1041,40 +1035,284 @@ else black+=v;
 return color==="w"?white-black:black-white;
 }
 
-function describeReply(m){
-if(!m.replySan||m.replySan==="—"){
-return"No legal opponent reply was found in the returned engine line.";
+function pieceName(piece){
+return PIECE_NAMES[piece]||"piece";
 }
 
-let text="After your move, Stockfish's strongest opponent response is "+m.replySan+".";
+function materialDescription(points){
+if(points>=8.5)return"approximately a queen";
+if(points>=4.5)return"approximately a rook";
+if(points>=2.5)return"approximately a minor piece";
+if(points>=1.5)return"approximately a minor-piece advantage";
+if(points>=.9)return"approximately a pawn";
+return"material";
+}
+
+/*
+TACTICAL EXPLANATION ENGINE
+
+This section examines:
+1. The actual position immediately after the played move.
+2. The opponent's strongest Stockfish reply.
+3. The material change caused by that reply.
+4. Captures, checks and tactical targets.
+5. The subsequent Stockfish PV.
+*/
+
+function getBoard(fen){
+return new Chess(fen).board();
+}
+
+function clearPath(board,from,to){
+const fx=from.charCodeAt(0)-97;
+const fy=Number(from[1])-1;
+const tx=to.charCodeAt(0)-97;
+const ty=Number(to[1])-1;
+
+const dx=Math.sign(tx-fx);
+const dy=Math.sign(ty-fy);
+
+let x=fx+dx,y=fy+dy;
+
+while(x!==tx||y!==ty){
+if(board[7-y][x])return false;
+x+=dx;y+=dy;
+}
+return true;
+}
+
+function pieceAttacks(board,from,to,piece){
+const fx=from.charCodeAt(0)-97;
+const fy=Number(from[1])-1;
+const tx=to.charCodeAt(0)-97;
+const ty=Number(to[1])-1;
+
+const dx=tx-fx,dy=ty-fy;
+const ax=Math.abs(dx),ay=Math.abs(dy);
+
+switch(piece.type){
+case"n":
+return(ax===1&&ay===2)||(ax===2&&ay===1);
+
+case"k":
+return Math.max(ax,ay)===1;
+
+case"p":
+return piece.color==="w"
+?ay===1&&ax===1&&dy===1
+:ay===1&&ax===1&&dy===-1;
+
+case"b":
+return ax===ay&&ax>0&&clearPath(board,from,to);
+
+case"r":
+return((dx===0&&dy!==0)||(dy===0&&dx!==0))&&clearPath(board,from,to);
+
+case"q":
+return((ax===ay&&ax>0)||(dx===0&&dy!==0)||(dy===0&&dx!==0))&&clearPath(board,from,to);
+}
+return false;
+}
+
+function findAttackedPieces(fen,attackerColor){
+const board=getBoard(fen);
+const targets=[];
+
+for(let r=0;r<8;r++){
+for(let c=0;c<8;c++){
+const target=board[r][c];
+if(!target||target.color===attackerColor)continue;
+
+const targetSq="abcdefgh"[c]+(8-r);
+const attackers=[];
+
+for(let ar=0;ar<8;ar++){
+for(let ac=0;ac<8;ac++){
+const attacker=board[ar][ac];
+if(!attacker||attacker.color!==attackerColor)continue;
+
+const from="abcdefgh"[ac]+(8-ar);
+
+if(pieceAttacks(board,from,targetSq,attacker)){
+attackers.push({
+from,
+type:attacker.type,
+color:attacker.color
+});
+}
+}
+}
+
+if(attackers.length){
+targets.push({
+square:targetSq,
+piece:target.type,
+color:target.color,
+attackers
+});
+}
+}
+}
+return targets;
+}
+
+function findNewThreats(beforeFen,afterFen,attackerColor){
+const before=findAttackedPieces(beforeFen,attackerColor);
+const after=findAttackedPieces(afterFen,attackerColor);
+
+return after.filter(target=>
+!before.some(old=>
+old.square===target.square&&
+old.attackers.some(a=>
+target.attackers.some(b=>a.from===b.from&&a.type===b.type)
+)
+)
+);
+}
+
+function tacticalMotifs(m){
+const out=[];
+
+if(!m.replyFen||!m.replyUci)return out;
+
+const opponent=m.color==="w"?"b":"w";
+const board=getBoard(m.replyFen);
+const from=m.replyUci.slice(0,2);
+const to=m.replyUci.slice(2,4);
+const movedPiece=board[8-Number(to[1])][to.charCodeAt(0)-97];
+
+if(!movedPiece)return out;
+
+const threats=findNewThreats(m.after,m.replyFen,opponent);
+
+const attackedByMoved=threats.filter(t=>
+t.attackers.some(a=>a.from===to)
+);
+
+const attackedKing=attackedByMoved.some(t=>t.piece==="k");
+const attackedValuable=attackedByMoved.filter(t=>
+["q","r","b","n"].includes(t.piece)
+);
+
+if(attackedKing&&attackedValuable.length){
+out.push(
+"Possible fork: the opponent's "+pieceName(movedPiece.type)+
+" attacks your king and another valuable piece simultaneously."
+);
+}else if(attackedValuable.length>=2){
+out.push(
+"Possible fork: the opponent's "+pieceName(movedPiece.type)+
+" attacks multiple valuable pieces at the same time."
+);
+}
+
+const newThreats=threats.filter(t=>
+!attackedByMoved.includes(t)
+);
+
+newThreats.forEach(t=>{
+const attacker=t.attackers[0];
+out.push(
+"The opponent also puts your "+pieceName(t.piece)+
+" on "+t.square+" under attack with the "+pieceName(attacker.type)+"."
+);
+});
+
+return out;
+}
+
+function buildTacticalExplanation(m){
+const parts=[];
+const opponent=m.color==="w"?"Black":"White";
+
+const beforeReply=materialBalance(m.after,m.color);
+const afterReply=materialBalance(m.replyFen||m.after,m.color);
+const swing=beforeReply-afterReply;
 
 if(m.replyCaptured){
-text+=" This response captures your "+m.replyCaptured.toUpperCase()+".";
-}
-if(m.replyCheck)text+=" It also gives check.";
-if(m.replyMate)text+=" The engine reports a forced mate continuation.";
+const captured=pieceName(m.replyCaptured);
+const value=MATERIAL[m.replyCaptured]||0;
 
-return text;
+parts.push(
+opponent+" immediately captures your "+captured+
+(value?" (worth "+value+" points)":"")+
+" with "+m.replySan+"."
+);
+}else if(m.replyCheck){
+parts.push(
+opponent+" responds with "+m.replySan+", giving check and forcing your king to respond."
+);
+}else{
+parts.push(
+opponent+"'s strongest response is "+m.replySan+"."
+);
 }
 
-function explainDamage(m){
-const before=materialBalance(m.before,m.color);
-const after=materialBalance(m.replyFen||m.after,m.color);
-const loss=before-after;
+if(m.replyMate){
+parts.push(
+"This continuation leads to a forced checkmate according to the engine."
+);
+}
 
-if(loss>=.9){
-return"After the strongest reply, your material balance worsens by approximately "+loss.toFixed(1)+" points. This is a concrete material consequence of the move.";
+if(swing>=.9){
+parts.push(
+"After this reply, your material balance drops by "+
+swing.toFixed(1)+" points. That is approximately "+
+materialDescription(swing)+"."
+);
+}else if(swing<=-.9){
+parts.push(
+"The immediate material balance actually improves for you by "+
+Math.abs(swing).toFixed(1)+" points. The engine's objection therefore comes from another positional or tactical factor."
+);
 }
-if(loss<=-.9){
-return"The resulting line changes the material balance by approximately "+Math.abs(loss).toFixed(1)+" points in your favour. The move has a material benefit, despite its engine evaluation.";
+
+const motifs=tacticalMotifs(m);
+parts.push(...motifs);
+
+if(m.replyLine&&m.replyLine.length>1){
+const continuation=m.replyLine.slice(1);
+const important=continuation.filter(x=>
+x.captured||x.check||x.mate
+);
+
+if(important.length){
+const descriptions=important.slice(0,3).map(x=>{
+if(x.mate)return x.san+" delivers checkmate";
+if(x.captured)return x.san+" captures your "+pieceName(x.captured);
+if(x.check)return x.san+" gives check";
+return x.san;
+});
+
+parts.push(
+"Further in the engine's continuation: "+
+descriptions.join("; ")+"."
+);
 }
+}
+
+if(!m.replyCaptured&&!m.replyCheck&&!m.replyMate&&
+swing<.9&&motifs.length===0){
 if(m.loss>=.25){
-return"The main damage is positional or tactical rather than an immediate material loss. Your expected result drops by "+(m.loss*100).toFixed(1)+" percentage points.";
+parts.push(
+"No immediate capture explains the full evaluation drop. Stockfish considers the resulting position significantly worse because of longer-term positional or tactical consequences."
+);
+}else{
+parts.push(
+"The first reply does not produce an obvious immediate material win. The disadvantage is mainly reflected in the engine's evaluation of the resulting position."
+);
 }
-if(m.loss>=.055){
-return"The move gives the opponent a meaningful improvement in the position. The engine sees a measurable loss of expected result.";
 }
-return"No major immediate material loss is detected in the first opponent reply. The evaluation difference is comparatively small.";
+
+if(m.loss>=.25){
+parts.push(
+"Your expected game result drops by "+
+(m.loss*100).toFixed(1)+
+" percentage points compared with the engine's best continuation."
+);
+}
+
+return parts;
 }
 
 function explanation(m){
@@ -1083,10 +1321,30 @@ return"You played Stockfish's top-ranked move at the selected search depth.";
 }else if(m.classification==="Good Move"){
 return"This move keeps the position relatively close to the engine's preferred continuation.";
 }else if(m.classification==="Bad Move"){
-return"This move gives the opponent a significant opportunity to improve their position.";
+return"This move allows a stronger continuation for your opponent. The tactical breakdown below shows the engine's response and the resulting consequences.";
 }else{
-return"This is a severe mistake. The move allows a major deterioration in the position and may leave the game close to a decisive result.";
+return"This is a severe mistake. Stockfish identifies a much stronger response for your opponent, causing a major deterioration in your position.";
 }
+}
+
+function renderTacticalDetails(parent,m){
+const heading=document.createElement("div");
+heading.className="tactical-heading";
+heading.textContent="Tactical breakdown";
+parent.appendChild(heading);
+
+const list=document.createElement("ul");
+list.className="tactical-list";
+
+const details=buildTacticalExplanation(m);
+
+details.forEach(detail=>{
+const li=document.createElement("li");
+li.textContent=detail;
+list.appendChild(li);
+});
+
+parent.appendChild(list);
 }
 
 function renderMove(ply){
@@ -1127,24 +1385,38 @@ d.appendChild(p);
 
 const damage=document.createElement("div");
 damage.className="impact "+(m.classification==="Chaos"?"danger":m.classification==="Engine Move"?"good":"");
+
 const damageTitle=document.createElement("strong");
 damageTitle.textContent="What happened because of this move?";
+
 const damageText=document.createElement("p");
-damageText.textContent=explainDamage(m);
+damageText.textContent=buildTacticalExplanation(m).join(" ");
+
 damage.append(damageTitle,damageText);
 d.appendChild(damage);
 
 const reply=document.createElement("div");
 reply.className="impact";
+
 const replyTitle=document.createElement("strong");
 replyTitle.textContent="Opponent's strongest response";
+
 const replyText=document.createElement("p");
-replyText.textContent=describeReply(m);
+replyText.textContent=m.replySan&&m.replySan!=="—"
+?"Stockfish's strongest reply is "+m.replySan+
+(m.replyCaptured
+?". It captures your "+pieceName(m.replyCaptured)+"."
+:".")
+:"No legal opponent reply was found in the engine's returned line.";
+
 reply.append(replyTitle,replyText);
 d.appendChild(reply);
 
+renderTacticalDetails(d,m);
+
 if(m.replyLine&&m.replyLine.length){
-addLine(d,"Engine continuation",m.replyLine.join(" "));
+addLine(d,"Engine continuation",
+m.replyLine.map(x=>x.san).join(" "));
 }
 
 addLine(d,"Played Move",m.san);
@@ -1228,7 +1500,7 @@ const isBest=!!bestUci&&p.uci.toLowerCase()===bestUci.toLowerCase();
 const phase=phaseOf(p.before,p.number);
 
 const replySan=sanFromUci(p.after,after.bestMove);
-const replyLine=convertPV(p.after,after.pv,6);
+const replyLine=convertPV(p.after,after.pv,8);
 
 let replyFen=p.after;
 let replyCaptured=null;
@@ -1246,6 +1518,7 @@ if(rm){
 replyFen=rg.fen();
 replyCaptured=rm.captured||null;
 replyCheck=rm.san.includes("+")||rm.san.includes("#");
+replyMate=rm.san.includes("#")||replyMate;
 }
 }catch{}
 
@@ -1267,6 +1540,7 @@ afterWDLRaw:after.wdl,
 afterSideToMove:after.sideToMove,
 bestMove:bestSan,
 bestUci,
+replyUci:after.bestMove,
 replySan,
 replyFen,
 replyCaptured,
