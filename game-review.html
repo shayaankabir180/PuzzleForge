@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,10 +136,13 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <section class="panel">
 <h2>Import a game</h2>
 <p class="muted">Choose a source or paste a PGN.</p>
+
 <div class="tabs">
 <button class="tab active" data-tab="pgn">PGN</button>
+<button class="tab" data-tab="chesscom">Chess.com</button>
 <button class="tab" data-tab="lichess">Lichess</button>
 </div>
+
 <div id="pgnTab">
 <label>Paste PGN</label>
 <textarea id="pgnInput" placeholder='[Event "Casual Game"]
@@ -150,18 +154,31 @@ label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
 <input type="file" id="pgnFile" accept=".pgn,text/plain">
 <button class="btn primary" id="loadPgn">Load PGN</button>
 </div>
+
+<div id="chesscomTab" class="hide">
+<label>Chess.com username</label>
+<div class="row">
+<input id="chesscomUser" placeholder="Enter Chess.com username">
+<button class="btn primary" id="fetchChessCom">Fetch 105 Games</button>
+</div>
+<p class="section-note">Fetches your latest 105 public games from Chess.com.</p>
+</div>
+
 <div id="lichessTab" class="hide">
 <label>Lichess username</label>
 <div class="row">
 <input id="lichessUser" placeholder="Username">
-<button class="btn primary" id="fetchLichess">Fetch Games</button>
+<button class="btn primary" id="fetchLichess">Fetch 105 Games</button>
 </div>
+<p class="section-note">Fetches your latest 105 public games from Lichess.</p>
 </div>
+
 <div id="gamePickerWrap" class="hide">
 <label>Select game</label>
 <select id="gamePicker"></select>
 <button class="btn primary" id="useSelected">Review Game</button>
 </div>
+
 <div id="importStatus" class="status"></div>
 </section>
 
@@ -394,10 +411,12 @@ message(games.length+" game(s) loaded.");
 }catch(e){message(e.message,true);}
 }
 
+/* IMPORT TABS */
+
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
 document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
 b.classList.add("active");
-["pgn","lichess"].forEach(n=>
+["pgn","chesscom","lichess"].forEach(n=>
 $(n+"Tab").classList.toggle("hide",n!==b.dataset.tab));
 });
 
@@ -413,15 +432,174 @@ const i=Number($("gamePicker").value),g=games[i];
 if(g){localStorage.setItem("pf_review_game_index",String(i));startGame(g.game);}
 };
 
-$("fetchLichess").onclick=async()=>{
-const u=$("lichessUser").value.trim();
-if(!u)return message("Enter username.",true);
-message("Fetching Lichess games...");
+/* CHESS.COM - FETCH LATEST 105 GAMES */
+
+$("fetchChessCom").onclick=async()=>{
+const username=$("chesscomUser").value.trim();
+
+if(!username)return message("Enter Chess.com username.",true);
+
+if(!/^[a-zA-Z0-9_-]+$/.test(username)){
+return message("Invalid Chess.com username.",true);
+}
+
+const btn=$("fetchChessCom");
+btn.disabled=true;
+btn.textContent="Fetching...";
+
 try{
-const r=await fetch("https://lichess.org/api/games/user/"+encodeURIComponent(u)+"?max=15&moves=true",{headers:{Accept:"application/x-chess-pgn"}});
-if(!r.ok)throw Error("Lichess error: "+r.status);
-loadText(await r.text());
-}catch(e){message(e.message,true);}
+message("Checking Chess.com username...");
+
+const base="https://api.chess.com/pub/player/"+encodeURIComponent(username);
+
+const profileResponse=await fetch(base,{
+headers:{"Accept":"application/json"}
+});
+
+if(profileResponse.status===404){
+throw Error("Chess.com username not found.");
+}
+if(!profileResponse.ok){
+throw Error("Chess.com profile error: "+profileResponse.status);
+}
+
+const profile=await profileResponse.json();
+
+if(!profile.username||profile.username.toLowerCase()!==username.toLowerCase()){
+throw Error("Username verification failed.");
+}
+
+message("Loading Chess.com game archives...");
+
+const archiveResponse=await fetch(base+"/games/archives",{
+headers:{"Accept":"application/json"}
+});
+
+if(!archiveResponse.ok){
+throw Error("Could not load Chess.com archives: "+archiveResponse.status);
+}
+
+const archiveData=await archiveResponse.json();
+const archives=(archiveData.archives||[]).slice().reverse();
+
+if(!archives.length){
+throw Error("No public game archives found.");
+}
+
+let allGames=[];
+
+for(let i=0;i<archives.length;i++){
+if(allGames.length>=105)break;
+
+message(
+"Fetching Chess.com archive "+(i+1)+" / "+archives.length+
+" · "+allGames.length+" games collected..."
+);
+
+const response=await fetch(archives[i],{
+headers:{"Accept":"application/json"}
+});
+
+if(!response.ok)continue;
+
+const data=await response.json();
+
+if(Array.isArray(data.games)){
+allGames.push(...data.games);
+}
+}
+
+allGames.sort((a,b)=>(b.end_time||0)-(a.end_time||0));
+
+const latestGames=allGames
+.filter(g=>g.pgn&&g.pgn.trim())
+.slice(0,105);
+
+if(!latestGames.length){
+throw Error("No public PGN games found in the archives.");
+}
+
+const combinedPGN=latestGames
+.map(g=>g.pgn.trim())
+.join("\n\n");
+
+$("pgnInput").value=combinedPGN;
+loadText(combinedPGN);
+
+if(games.length){
+$("gamePicker").selectedIndex=0;
+message(
+"Successfully fetched "+games.length+
+" latest Chess.com game(s). Select a game to review."
+);
+}
+
+}catch(e){
+console.error("Chess.com import error:",e);
+message("Chess.com import failed: "+e.message,true);
+}finally{
+btn.disabled=false;
+btn.textContent="Fetch 105 Games";
+}
+};
+
+/* LICHESS - FETCH LATEST 105 GAMES */
+
+$("fetchLichess").onclick=async()=>{
+const username=$("lichessUser").value.trim();
+
+if(!username)return message("Enter Lichess username.",true);
+
+const btn=$("fetchLichess");
+btn.disabled=true;
+btn.textContent="Fetching...";
+
+try{
+message("Fetching your latest 105 Lichess games...");
+
+const url=
+"https://lichess.org/api/games/user/"+
+encodeURIComponent(username)+
+"?max=105&moves=true&clocks=false&evals=false&opening=false";
+
+const response=await fetch(url,{
+headers:{
+"Accept":"application/x-chess-pgn"
+}
+});
+
+if(response.status===404){
+throw Error("Lichess username not found.");
+}
+
+if(!response.ok){
+throw Error("Lichess API error: "+response.status);
+}
+
+const pgn=await response.text();
+
+if(!pgn.trim()){
+throw Error("No public games found for this Lichess username.");
+}
+
+$("pgnInput").value=pgn;
+loadText(pgn);
+
+if(games.length){
+$("gamePicker").selectedIndex=0;
+message(
+"Successfully fetched "+games.length+
+" latest Lichess game(s). Select a game to review."
+);
+}
+
+}catch(e){
+console.error("Lichess import error:",e);
+message("Lichess import failed: "+e.message,true);
+}finally{
+btn.disabled=false;
+btn.textContent="Fetch 105 Games";
+}
 };
 
 /* STOCKFISH ENGINE */
