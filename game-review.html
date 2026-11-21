@@ -1,0 +1,1347 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#090b10"><title>Game Review — PuzzleForge</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<!-- PuzzleForge review modules --><!-- Embedded PuzzleForge modules: no separate review/*.js files are required. -->
+<script>/* PuzzleForge Opening Book — merged supplied openings.json + openingBook.js. */
+(function (w) {
+  "use strict";
+  const lines = [{
+    "eco":"C20","name":"King's Pawn Game","moves":["e4","e5"]
+  },{
+    "eco":"C50","name":"Italian Game","moves":["e4","e5","Nf3","Nc6","Bc4"]
+  },{
+    "eco":"C65","name":"Ruy Lopez","moves":["e4","e5","Nf3","Nc6","Bb5"]
+  },{
+    "eco":"B20","name":"Sicilian Defense","moves":["e4","c5"]
+  },{
+    "eco":"B10","name":"Caro-Kann Defense","moves":["e4","c6","d4","d5"]
+  },{
+    "eco":"C00","name":"French Defense","moves":["e4","e6","d4","d5"]
+  },{
+    "eco":"D06","name":"Queen's Gambit","moves":["d4","d5","c4"]
+  },{
+    "eco":"A10","name":"English Opening","moves":["c4"]
+  },{
+    "eco":"D00","name":"London System","moves":["d4","Nf6","Bf4"]
+  },{
+    "eco":"E60","name":"King's Indian Defense","moves":["d4","Nf6","c4","g6"]
+  },{
+    "eco":"A40","name":"Queen's Pawn Game","moves":["d4"]
+  },{
+    "eco":"A04","name":"Réti Opening","moves":["Nf3","d5"]
+  },{
+    "eco":"B01","name":"Scandinavian Defense","moves":["e4","d5"]
+  },{
+    "eco":"C42","name":"Petrov's Defense","moves":["e4","e5","Nf3","Nf6"]
+  },{
+    "eco":"C44","name":"Scotch Game","moves":["e4","e5","Nf3","Nc6","d4"]
+  }];
+  function clean(s) {
+    return String(s || "").replace(/[+#?!]+/g, "").trim();
+  }
+  function identify(sans) {
+    const moves = (sans || []).map(clean);
+    let best = null;
+    for (const line of lines) {
+      if (line.moves.length <= moves.length &&
+      line.moves.every((m, i) => clean(m) === moves[i]) &&
+      (!best || line.moves.length > best.moves.length)) {
+        best = {
+          eco: line.eco, name: line.name, moves: line.moves.slice(), ply: line.moves.length
+        };
+      }
+    }
+    return best ? Object.freeze(best) : null;
+  }
+  w.PFReviewBook = Object.freeze({
+    identify, lines: lines.map(x => ({
+      eco:x.eco, name:x.name, moves:x.moves.slice()
+    })), source:"embedded openings.json + openingBook.js"
+  });
+})(window);
+</script>
+<script>/* PuzzleForge move labels. Thresholds are transparent CPL estimates, not official platform labels. */
+(function (w) {
+  "use strict";
+  const DEFAULTS = {
+    best: 10, good: 50, inaccuracy: 100, mistake: 200
+  };
+  function classify(cpl, opts) {
+    const t = Object.assign({
+    }, DEFAULTS, opts || {
+    });
+    if (cpl == null || !Number.isFinite(Number(cpl))) {
+      return {
+        label: "Unrated", key: "unrated"
+      };
+    }
+    const n = Math.max(0, Number(cpl));
+    if (n <= t.best) return {
+      label: "Best", key: "best"
+    };
+    if (n <= t.good) return {
+      label: "Good", key: "good"
+    };
+    if (n <= t.inaccuracy) return {
+      label: "Inaccuracy", key: "inaccuracy"
+    };
+    if (n <= t.mistake) return {
+      label: "Mistake", key: "mistake"
+    };
+    return {
+      label: "Blunder", key: "blunder"
+    };
+  }
+  w.PFReviewClassifier = Object.freeze({
+    classify, defaults: DEFAULTS
+  });
+})(window);
+</script>
+<script>/* Conservative tactical tags. This module does not claim to solve tactics by itself. */
+(function (w) {
+  "use strict";
+  function inspect(move, beforeEval, afterEval, bestMove) {
+    const tags = [];
+    if (!move) return tags;
+    if (move.san && move.san.includes("#")) tags.push("Checkmate");
+    else if (move.san && move.san.includes("+")) tags.push("Check");
+    if (move.captured) tags.push("Capture");
+    if (move.promotion) tags.push("Promotion");
+    const played = String(move.from||"") + String(move.to||"");
+    const best = String(bestMove||"").slice(0,4);
+    const isBest = best && played === best;
+    const loss = (Number.isFinite(beforeEval) && Number.isFinite(afterEval))
+    ? Math.max(0, beforeEval-afterEval) : null;
+    if (move.captured && loss !== null && loss <= 0.10 && isBest) tags.push("Tactically sound capture");
+    return tags;
+  }
+  function brilliantCandidate(move, cpl, evalAfter, bestMove) {
+    if (!move || !bestMove || !Number.isFinite(cpl) || !Number.isFinite(evalAfter)) return false;
+    const played = String(move.from||"") + String(move.to||"");
+    const best = String(bestMove).slice(0,4);
+    // Deliberately conservative: only flag candidate sacrifices for human/engine verification.
+                const isSacrifice = !!move.piece && !move.captured && ["q","r","b","n"].includes(move.piece);
+    return isSacrifice && played === best && cpl <= 10 && evalAfter >= -0.30;
+  }
+  w.PFReviewTactics = Object.freeze({
+    inspect, brilliantCandidate
+  });
+})(window);
+</script>
+<script>/* Short, factual move explanations built from engine result + move metadata. */
+(function (w) {
+  "use strict";
+  const copy = {
+    best:"This move matches the engine's top choice.",
+    good:"A reasonable move that keeps most of the position's value.",
+    inaccuracy:"This move gives the opponent a noticeable improvement.",
+    mistake:"This move loses a significant amount of evaluation.",
+    blunder:"This move causes a major deterioration in the position."
+  };
+  function explain(moveResult) {
+    const r = moveResult || {
+    };
+    const label = (r.classification && r.classification.key) || "unrated";
+    const parts = [copy[label] || "This move could not be classified reliably."];
+    if (r.bestSan && r.playedSan && r.bestSan !== r.playedSan)
+    parts.push("The engine preferred " + r.bestSan + ".");
+    if (Number.isFinite(r.cpl)) parts.push("Estimated centipawn loss: " + Math.round(r.cpl) + ".");
+    if (Array.isArray(r.tags) && r.tags.length) parts.push("Position tags: " + r.tags.join(", ") + ".");
+    return parts.join(" ");
+  }
+  w.PFReviewExplanation = Object.freeze({
+    explain
+  });
+})(window);
+</script>
+<script>/* Game-level accuracy estimate. */
+(function (w) {
+  "use strict";
+  function fromLosses(losses) {
+    const valid = (losses || []).map(Number).filter(Number.isFinite).map(x=>Math.max(0,x));
+    if (!valid.length) return 0;
+    const avg = valid.reduce((a,b)=>a+b,0)/valid.length;
+    // Smooth diminishing-return curve; clearly presented as PuzzleForge's estimate.
+                const score = 100 * Math.exp(-0.035 * avg);
+    return Math.max(0, Math.min(100, Math.round(score*10)/10));
+  }
+  function summary(results) {
+    const counts = {
+      best:0,good:0,inaccuracy:0,mistake:0,blunder:0,book:0,unrated:0
+    };
+    (results||[]).forEach(r=>{
+      const k = r.classification && r.classification.key;
+      counts[counts[k] !== undefined ? k : "unrated"]++;
+    });
+    return {
+      accuracy:fromLosses((results||[]).map(r=>r.cpl)), counts,
+      total:(results||[]).length
+    };
+  }
+  w.PFReviewAccuracy = Object.freeze({
+    fromLosses, summary
+  });
+})(window);
+</script>
+<script>/* Reliable UCI adapter for a Stockfish single-thread worker. */
+(function (w) {
+  "use strict";
+  class StockfishAdapter {
+    constructor(workerUrl) {
+      this.worker = new Worker(workerUrl);
+      this.lines = [];
+      this.waiters = new Set();
+      this.readyPromise = null;
+      this.worker.onmessage = event => {
+        const line = typeof event.data === "string" ? event.data : "";
+        if (!line) return;
+        this.lines.push(line);
+        for (const waiter of [...this.waiters]) waiter.check(line);
+      };
+      this.worker.postMessage("uci");
+    }
+    send(command) {
+      this.worker.postMessage(command);
+    }
+    waitFor(predicate, timeoutMs) {
+      return new Promise((resolve, reject) => {
+        let done = false;
+        let timer;
+        const finish = (error, value) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          this.waiters.delete(waiter);
+          if (error) reject(error);
+          else resolve(value);
+        };
+        const waiter = {
+          check: line => {
+            if (!done && predicate(line)) finish(null, line);
+          }
+        };
+        timer = setTimeout(() => finish(new Error("Stockfish timed out waiting for engine response.")), timeoutMs || 20000);
+        this.waiters.add(waiter);
+        for (const line of this.lines) waiter.check(line);
+      });
+    }
+    async ready() {
+      if (this.readyPromise) return this.readyPromise;
+      this.readyPromise = (async () => {
+        await this.waitFor(line => line === "uciok", 15000);
+        this.send("isready");
+        await this.waitFor(line => line === "readyok", 15000);
+        return true;
+      })().catch(error => {
+        this.readyPromise = null;
+        throw error;
+      });
+      return this.readyPromise;
+    }
+    async analyse(fen, depth) {
+      await this.ready();
+      const start = this.lines.length;
+      this.send("position fen " + fen);
+      this.send("go depth " + (depth || 14));
+      const bestLine = await this.waitFor(line => /^bestmove /.test(line), 45000);
+      const fresh = this.lines.slice(start);
+      const info = fresh.slice().reverse().find(line => /^info .* score /.test(line)) || "";
+      const bestMove = bestLine.split(/\s+/)[1] || "(none)";
+      const cpMatch = info.match(/\bscore cp (-?\d+)/);
+      const mateMatch = info.match(/\bscore mate (-?\d+)/);
+      return {
+        bestMove,
+        cp: cpMatch ? Number(cpMatch[1]) : null,
+        mate: mateMatch ? Number(mateMatch[1]) : null,
+        info
+      };
+    }
+    terminate() {
+      if (this.worker) this.worker.terminate();
+      this.worker = null;
+      this.waiters.clear();
+    }
+  }
+  w.PFStockfishAdapter = StockfishAdapter;
+})(window);
+</script>
+<script>/* PuzzleForge review orchestrator. Evaluator scores must be from side-to-move perspective. */
+(function (w) {
+  "use strict";
+  function analysePgn(pgn, evaluateFen, options) {
+    if (typeof w.Chess !== "function") throw new Error("Load chess.js before PuzzleForge review modules.");
+    if (typeof evaluateFen !== "function") throw new Error("Provide an async evaluateFen(fen) function backed by Stockfish.");
+    return runAnalysis(pgn, evaluateFen, options || {
+    });
+  }
+  async function runAnalysis(pgn, evaluateFen, options) {
+    const game = new w.Chess();
+    if (!game.load_pgn(pgn)) throw new Error("The supplied PGN could not be parsed.");
+    const verbose = game.history({
+       verbose: true
+    });
+    const sans = game.history();
+    const opening = w.PFReviewBook ? w.PFReviewBook.identify(sans) : null;
+    const replay = new w.Chess();
+    const results = [];
+    const depth = options.depth || 14;
+    for (let i = 0; i < verbose.length; i++) {
+      const move = verbose[i];
+      const beforeFen = replay.fen();
+      const before = await evaluateFen(beforeFen, {
+         depth
+      });
+      const played = replay.move(move);
+      if (!played) throw new Error("Could not replay move " + (i + 1) + ".");
+      const afterFen = replay.fen();
+      const after = await evaluateFen(afterFen, {
+         depth
+      });
+      // Before score is from the mover's perspective; after score is from the opponent's.
+            const beforeMover = Number.isFinite(before.cp) ? before.cp : null;
+      const afterMover = Number.isFinite(after.cp) ? -after.cp : null;
+      const cpl = beforeMover !== null && afterMover !== null
+      ? Math.max(0, beforeMover - afterMover)
+      : null;
+      const classification = w.PFReviewClassifier.classify(cpl, options.thresholds);
+      const tags = w.PFReviewTactics.inspect(
+      played,
+      beforeMover === null ? NaN : beforeMover / 100,
+      afterMover === null ? NaN : afterMover / 100,
+      before.bestMove
+      );
+      const item = {
+        ply: i + 1,
+        moveNumber: Math.floor(i / 2) + 1,
+        color: i % 2 === 0 ? "white" : "black",
+        san: played.san,
+        from: played.from,
+        to: played.to,
+        fenBefore: beforeFen,
+        fenAfter: afterFen,
+        bestMove: before.bestMove || null,
+        cpl,
+        classification,
+        tags,
+        beforeEval: beforeMover,
+        afterEval: afterMover
+      };
+      item.explanation = w.PFReviewExplanation.explain({
+        classification,
+        cpl,
+        bestSan: before.bestSan,
+        playedSan: played.san,
+        tags
+      });
+      results.push(item);
+    }
+    const white = results.filter(result => result.color === "white");
+    const black = results.filter(result => result.color === "black");
+    return {
+      opening,
+      moves: results,
+      white: w.PFReviewAccuracy.summary(white),
+      black: w.PFReviewAccuracy.summary(black),
+      overall: w.PFReviewAccuracy.summary(results),
+      note: "Game estimates based on the selected analysis depth."
+    };
+  }
+  w.PFGameAnalyzer = Object.freeze({
+     analysePgn
+  });
+})(window);
+</script>
+<style>
+:root{--bg:#090b10;
+--panel:#171b24;
+--panel2:#10141d;
+--line:#292f3b;
+--text:#f4f5f7;
+--muted:#9299a8;
+--gold:#cbb36a;
+--green:#72b68b;
+--red:#d97878}
+*{box-sizing:border-box}
+body{margin:0;
+background:var(--bg);
+color:var(--text);
+font:14px/1.5 Inter,system-ui,Arial,sans-serif}
+button,input,textarea,select{font:inherit}
+.top{border-bottom:1px solid var(--line);
+padding:14px 18px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+gap:12px;
+flex-wrap:wrap}
+.brand{font-size:19px;
+font-weight:800;
+text-decoration:none;
+color:white}
+.nav{display:flex;
+gap:8px;
+flex-wrap:wrap}
+.nav a{border:1px solid var(--line);
+background:var(--panel);
+padding:8px 11px;
+border-radius:8px;
+font-size:12px;
+color:white;
+text-decoration:none}
+.wrap{width:min(1250px,calc(100% - 28px));
+margin:28px auto 60px}
+.eyebrow{color:var(--gold);
+font-size:11px;
+font-weight:800;
+letter-spacing:1.5px}
+h1{font-size:clamp(26px,4vw,36px);
+margin:5px 0}
+.muted{color:var(--muted)}
+.panel,.category-panel{background:var(--panel);
+border:1px solid var(--line);
+border-radius:13px;
+padding:17px;
+margin:14px 0}
+.panel h2,.category-panel h2{font-size:16px;
+margin:0 0 5px}
+.tabs{display:flex;
+gap:7px;
+flex-wrap:wrap;
+margin:12px 0}
+.tab,.btn{border:1px solid #454c59;
+background:#202631;
+color:var(--text);
+padding:10px 13px;
+border-radius:8px;
+font-size:12px;
+font-weight:700;
+cursor:pointer}
+.tab.active,.btn.primary{background:var(--gold);
+border-color:var(--gold);
+color:#111}
+.btn:disabled{opacity:.45;
+cursor:not-allowed}
+input,textarea,select{width:100%;
+background:#0e121a;
+border:1px solid #343b48;
+border-radius:8px;
+padding:11px;
+color:white;
+outline:none}
+textarea{min-height:120px;
+resize:vertical}
+label{display:block;
+color:var(--muted);
+font-size:12px;
+margin:10px 0 5px}
+.row{display:flex;
+gap:9px;
+align-items:center;
+flex-wrap:wrap}
+.row>*{flex:1}
+.status{font-size:12px;
+min-height:20px;
+margin-top:9px;
+color:#a9c99b}
+.error{color:#e5a09a!important}
+.hide{display:none!important}
+.grid{display:grid;
+grid-template-columns:minmax(260px,46%) minmax(300px,1fr);
+gap:16px;
+align-items:start}
+.board-area{min-width:0}
+.board-wrap{position:relative;
+width:100%;
+max-width:560px;
+margin:auto}
+.board{position:relative;
+display:grid;
+grid-template-columns:repeat(8,1fr);
+width:100%;
+aspect-ratio:1;
+border:1px solid #444;
+overflow:hidden}
+.sq{position:relative;
+aspect-ratio:1;
+display:grid;
+place-items:center;
+font-size:clamp(22px,5.2vw,54px);
+user-select:none}
+.light{background:#f0d9b5;
+color:#171717}
+.dark{background:#b58863;
+color:#171717}
+.sq img{width:82%;
+height:82%;
+object-fit:contain;
+display:block;
+transition:none;
+transform:translateZ(0);
+backface-visibility:hidden;
+pointer-events:none}
+.sq.last-from,.sq.last-to{box-shadow:inset 0 0 0 3px rgba(203,179,106,.9)}
+.sq-badge{position:absolute;
+top:2px;
+right:2px;
+z-index:5;
+width:clamp(15px,2.7vw,25px);
+height:clamp(15px,2.7vw,25px);
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:clamp(10px,2vw,16px);
+font-weight:900;
+border:1px solid rgba(255,255,255,.55);
+background:#202631;
+color:white}
+.sq-badge-best{background:#167c69}
+.sq-badge-good{background:#527d42}
+.sq-badge-inaccuracy{background:#a17a20}
+.sq-badge-mistake{background:#b65d25}
+.sq-badge-blunder{background:#a93242}
+.sq-badge-book{background:#596579}
+.coord{position:absolute;
+z-index:6;
+font-size:clamp(8px,1.45vw,10px);
+font-weight:800;
+left:2px;
+top:2px;
+padding:0;
+background:transparent;
+pointer-events:none}
+.arrow-layer{position:absolute;
+inset:0;
+width:100%;
+height:100%;
+pointer-events:none;
+z-index:10}
+.controls{display:flex;
+gap:7px;
+margin-top:10px}
+.controls button{flex:1}
+.evalbar{height:13px;
+background:#fff;
+border-radius:5px;
+overflow:hidden;
+margin:9px 0}
+.evalwhite{height:100%;
+background:#171b24;
+width:50%;
+transition:width .2s}
+.evaltext,.probability-line{display:flex;
+justify-content:space-between;
+gap:5px;
+font-size:11px;
+color:var(--muted)}
+.stats{display:grid;
+grid-template-columns:repeat(3,minmax(0,1fr));
+gap:9px;
+margin:12px 0}
+.stat,.category-stat{background:var(--panel2);
+border:1px solid var(--line);
+border-radius:9px;
+padding:12px;
+min-width:0}
+.stat small,.category-stat small{display:block;
+color:var(--muted);
+font-size:10px;
+text-transform:uppercase;
+letter-spacing:.5px}
+.stat strong{font-size:24px;
+display:block;
+margin-top:3px}
+.category-grid{display:grid;
+grid-template-columns:repeat(3,minmax(0,1fr));
+gap:8px;
+margin-top:12px}
+.category-stat strong{font-size:21px}
+.moves{display:flex;
+flex-wrap:wrap;
+gap:5px;
+max-height:250px;
+overflow:auto;
+margin-top:10px}
+.move{border:1px solid transparent;
+background:#10141d;
+color:#ddd;
+border-radius:5px;
+padding:5px 7px;
+font-size:12px;
+cursor:pointer}
+.move.current{border-color:var(--gold);
+background:#302a1b;
+color:#fff}
+.graph{width:100%;
+height:125px;
+background:#10141d;
+border:1px solid var(--line);
+border-radius:8px}
+.analysis-box,.prob-card{background:var(--panel2);
+padding:12px;
+border-radius:9px;
+margin-top:10px}
+.classification-badge{display:inline-block;
+padding:5px 10px;
+border-radius:6px;
+font-size:12px;
+font-weight:800;
+margin-bottom:8px}
+.badge-best{background:#174b4a;
+color:#75e3d9}
+.badge-good{background:#293f35;
+color:#b5d9bb}
+.badge-inaccuracy{background:#514622;
+color:#ead17c}
+.badge-mistake{background:#593c28;
+color:#f0b17d}
+.badge-blunder{background:#582b32;
+color:#f19ba2}
+.badge-book{background:#343b49;
+color:#cbd5e1}
+.classification-icon{display:inline-grid;
+place-items:center;
+width:23px;
+height:23px;
+border-radius:50%;
+font-size:13px;
+font-weight:900;
+margin-right:6px;
+vertical-align:middle;
+background:rgba(255,255,255,.12);
+border:1px solid currentColor}
+.classification-badge{display:inline-flex;
+align-items:center}
+.section-note,.rating-note{font-size:11px;
+color:var(--muted);
+line-height:1.6}
+.phase-bar,.prob-track{height:8px;
+background:#303744;
+border-radius:8px;
+overflow:hidden;
+margin-top:6px}
+.phase-fill,.prob-fill{height:100%;
+background:var(--green);
+border-radius:8px}
+.detail-text{font-size:13px;
+line-height:1.7;
+color:#d7dbe3}
+.detail-text p{margin:8px 0}
+.advanced-grid{display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:9px;
+margin-top:12px}
+.advanced-item{background:var(--panel2);
+border:1px solid var(--line);
+border-radius:8px;
+padding:11px}
+.advanced-item small{display:block;
+color:var(--muted);
+font-size:10px;
+text-transform:uppercase}
+.advanced-item strong{font-size:18px}
+.what-happened{background:#10141d;
+border:1px solid var(--line);
+border-radius:8px;
+padding:12px;
+margin:10px 0}
+.what-happened h3{font-size:13px;
+margin:0 0 7px;
+color:var(--gold)}
+.what-happened ul{margin:0;
+padding-left:19px}
+.what-happened li{font-size:13px;
+line-height:1.65;
+color:#d7dbe3;
+margin:4px 0}
+.classification-table{width:100%;
+border-collapse:collapse;
+margin-top:12px;
+font-size:13px}
+.classification-table th,.classification-table td{padding:10px 12px;
+border-bottom:1px solid var(--line);
+text-align:right}
+.classification-table th:first-child,.classification-table td:first-child{text-align:left}
+.classification-table thead th{color:var(--muted);
+font-size:11px;
+text-transform:uppercase;
+letter-spacing:.6px}
+.phase-side{display:flex;
+justify-content:space-between;
+gap:10px;
+font-size:12px;
+margin-top:9px}
+.phase-side strong{font-size:13px}
+.phase-card{background:var(--panel2);
+border:1px solid var(--line);
+border-radius:9px;
+padding:12px}
+.phase-card h3{font-size:13px;
+margin:0 0 8px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}
+.stats{grid-template-columns:repeat(2,1fr)}
+.category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.wrap{margin-top:20px}
+}
+</style>
+</head><body><header class="top"><a class="brand" href="index.html">♟ PuzzleForge</a><nav class="nav"><a href="index.html">Home</a><a href="puzzle-arena.html">Puzzle Contriving</a><a href="library.html">Library</a></nav></header><main class="wrap"><div class="eyebrow">PUZZLEFORGE · PROPRIETARY REVIEW ENGINE</div><h1>Game Review</h1><p class="muted">Engine-assisted analysis, tactical event explanations, opening recognition and practical learning.</p><section class="panel"><h2>Import a game</h2><p class="muted">Choose a source or paste a PGN.</p><div id="pgnTab"><label>Paste PGN</label><textarea id="pgnInput" placeholder='[Event "Casual Game"]&#10;[White "Player"]&#10;[Black "Opponent"]&#10;&#10;1. e4 e5 2. Nf3 Nc6 ...'></textarea><label>Or upload PGN</label><input type="file" id="pgnFile" accept=".pgn,text/plain"><button class="btn primary" id="loadPgn">Load PGN</button></div></div><div id="gamePickerWrap" class="hide"><label>Select game</label><select id="gamePicker"></select><button class="btn primary" id="useSelected">Review Game</button></div><div id="importStatus" class="status"></div></section><section id="reviewSection" class="hide"><div class="stats"><div class="stat"><small>Performance Estimate · White</small><strong id="whiteRating">—</strong></div><div class="stat"><small>Performance Estimate · Black</small><strong id="blackRating">—</strong></div><div class="stat"><small>Win-probability Accuracy · White</small><strong id="whiteAccuracy">—</strong></div><div class="stat"><small>Win-probability Accuracy · Black</small><strong id="blackAccuracy">—</strong></div><div class="stat"><small>Average CPL · White</small><strong id="whiteCPL">—</strong></div><div class="stat"><small>Average CPL · Black</small><strong id="blackCPL">—</strong></div></div><p class="rating-note">Performance and accuracy figures are estimates based on this game’s analysis.</p><div class="category-panel"><h2>Opening Recognition</h2><div id="openingInfo" class="section-note">Opening will be identified after loading a game.</div></div><div class="category-panel"><h2>Phase-wise Accuracy</h2><p class="section-note">White and Black are calculated separately for each phase. A dash means that side had no analysed moves in that phase.</p><div class="category-grid"><div class="phase-card"><h3>Opening</h3><div class="phase-side"><span>White</span><strong id="openingWhiteAccuracy">—</strong></div><div class="phase-bar"><div class="phase-fill" id="openingWhiteBar" style="width:0%"></div></div><div class="phase-side"><span>Black</span><strong id="openingBlackAccuracy">—</strong></div><div class="phase-bar"><div class="phase-fill" id="openingBlackBar" style="width:0%"></div></div></div><div class="phase-card"><h3>Middlegame</h3><div class="phase-side"><span>White</span><strong id="middlegameWhiteAccuracy">—</strong></div><div class="phase-bar"><div class="phase-fill" id="middlegameWhiteBar" style="width:0%"></div></div><div class="phase-side"><span>Black</span><strong id="middlegameBlackAccuracy">—</strong></div><div class="phase-bar"><div class="phase-fill" id="middlegameBlackBar" style="width:0%"></div></div></div><div class="phase-card"><h3>Endgame</h3><div class="phase-side"><span>White</span><strong id="endgameWhiteAccuracy">—</strong></div><div class="phase-bar"><div class="phase-fill" id="endgameWhiteBar" style="width:0%"></div></div><div class="phase-side"><span>Black</span><strong id="endgameBlackAccuracy">—</strong></div><div class="phase-bar"><div class="phase-fill" id="endgameBlackBar" style="width:0%"></div></div></div></div></div><div class="category-panel"><h2>Move Classification · White vs Black</h2><table class="classification-table"><thead><tr><th>Classification</th><th>White</th><th>Black</th><th>Total</th></tr></thead><tbody><tr><td>Best</td><td id="wCountBest">0</td><td id="bCountBest">0</td><td id="allCountBest">0</td></tr><tr><td>Good</td><td id="wCountGood">0</td><td id="bCountGood">0</td><td id="allCountGood">0</td></tr><tr><td>Inaccuracy</td><td id="wCountInaccuracy">0</td><td id="bCountInaccuracy">0</td><td id="allCountInaccuracy">0</td></tr><tr><td>Mistake</td><td id="wCountMistake">0</td><td id="bCountMistake">0</td><td id="allCountMistake">0</td></tr><tr><td>Blunder</td><td id="wCountBlunder">0</td><td id="bCountBlunder">0</td><td id="allCountBlunder">0</td></tr><tr><td>Book</td><td id="wCountBook">0</td><td id="bCountBook">0</td><td id="allCountBook">0</td></tr></tbody></table></div><div class="stats"><div class="stat"><small>PuzzleForge CPL Accuracy · White</small><strong id="pfWhiteAccuracy">—</strong></div><div class="stat"><small>PuzzleForge CPL Accuracy · Black</small><strong id="pfBlackAccuracy">—</strong></div><div class="stat"><small>Moves Analysed</small><strong id="totalMoves">0</strong></div></div><div class="grid"><div class="board-area panel"><div class="row"><strong id="whiteName">White</strong><span id="gameResult">Game</span><strong id="blackName">Black</strong></div><div class="evalbar"><div class="evalwhite" id="evalWhite"></div></div><div class="evaltext"><span id="evalScore">0.0</span><span id="moveCount">Start</span></div><div class="probability-line"><span id="whiteProb">White: 33%</span><span id="drawProb">Draw: 34%</span><span id="blackProb">Black: 33%</span></div><div class="board-wrap"><div class="board" id="board"></div><svg class="arrow-layer" id="arrowLayer" viewBox="0 0 800 800"><defs><marker id="arrowHead" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#27d5a0"/></marker></defs><line id="bestArrow" x1="0" y1="0" x2="0" y2="0" stroke="#27d5a0" stroke-width="13" stroke-linecap="round" marker-end="url(#arrowHead)" opacity="0"/></svg></div><div class="controls"><button class="btn" id="firstMove">|◀</button><button class="btn" id="prevMove">◀</button><button class="btn" id="nextMove">▶</button><button class="btn" id="lastMove">▶|</button></div><p class="section-note">Green arrow shows the engine's top move when it differs from the played move.</p></div><div><div class="panel"><h2 id="reviewHeading">Move Review</h2><div id="moveDetail" class="analysis-box">Select a move and analyse the game.</div><div class="moves" id="moveList"></div></div><div class="panel"><h2>Evaluation Graph</h2><svg class="graph" id="evalGraph" viewBox="0 0 600 140" preserveAspectRatio="none"><path d="M0 70H600" stroke="#596273" stroke-dasharray="5 5"/><polyline id="graphLine" points="" fill="none" stroke="#cbb36a" stroke-width="3"/><line id="graphCursor" x1="0" y1="0" x2="0" y2="140" stroke="#fff" stroke-width="1" opacity=".5"/></svg><p class="section-note">Evaluation is from White's perspective.</p></div></div></div><div class="category-panel" id="playerIntelligence"><h2>Player Intelligence</h2><p class="section-note">Rule-based pattern analysis of this game. Insights become more useful across multiple reviewed games.</p><div class="category-grid"><div class="category-stat"><small>Blunders</small><strong id="piBlunders">0</strong></div><div class="category-stat"><small>Mistakes</small><strong id="piMistakes">0</strong></div><div class="category-stat"><small>Inaccuracies</small><strong id="piInaccuracies">0</strong></div><div class="category-stat"><small>Best Moves</small><strong id="piBest">0</strong></div><div class="category-stat"><small>Good Moves</small><strong id="piGood">0</strong></div><div class="category-stat"><small>Missed Tactics</small><strong id="piMissedTactics">0</strong></div></div><div class="analysis-box"><strong>Insights</strong><div id="piInsights" class="detail-text">Analyse a game to generate player insights.</div></div><div class="analysis-box"><strong>Repeated Patterns</strong><div id="piPatterns" class="detail-text">No patterns available yet.</div></div><p class="section-note">This is a rule-based foundation, not a trained machine-learning model. It does not learn from other users or retain a cross-game player profile.</p></div><div class="panel"><h2>Advanced Statistics</h2><div class="advanced-grid"><div class="advanced-item"><small>Average CPL · White</small><strong id="advancedWhiteCPL">—</strong></div><div class="advanced-item"><small>Average CPL · Black</small><strong id="advancedBlackCPL">—</strong></div><div class="advanced-item"><small>Average Expected Points Loss · White</small><strong id="whiteEPL">—</strong></div><div class="advanced-item"><small>Average Expected Points Loss · Black</small><strong id="blackEPL">—</strong></div><div class="advanced-item"><small>White Moves Analysed</small><strong id="whiteMovesAnalysed">0</strong></div><div class="advanced-item"><small>Black Moves Analysed</small><strong id="blackMovesAnalysed">0</strong></div><div class="advanced-item"><small>White Best-Move Rate</small><strong id="whiteBestRate">—</strong></div><div class="advanced-item"><small>Black Best-Move Rate</small><strong id="blackBestRate">—</strong></div></div></div><div class="panel"><div class="row"><div><h2>Stockfish Analysis</h2><p class="muted" id="engineStatus">Engine not started.</p></div><button class="btn primary" id="analyseBtn">Analyse Game</button></div><label>Analysis depth</label><select id="depthSelect"><option value="10">Depth 10 · Faster</option><option value="12">Depth 12 · Faster</option><option value="15" selected>Depth 15 · Balanced</option><option value="18">Depth 18 · Deep (slower)</option></select><div id="analysisProgress" class="status"></div></div></section></main>
+<script>/* Lightweight Player Intelligence fallback. This is rule-based, not machine learning. */
+(function(w){
+  "use strict";
+  function analyze(moves){
+    const stats={
+      best:0,good:0,inaccuracies:0,mistakes:0,blunders:0,missedTactics:0
+    };
+    const patterns={
+    };
+    (moves||[]).forEach(move=>{
+      const key=move.classificationKey||move.classification;
+      if(key==="best")stats.best++;
+      if(key==="good")stats.good++;
+      if(key==="inaccuracy")stats.inaccuracies++;
+      if(key==="mistake")stats.mistakes++;
+      if(key==="blunder")stats.blunders++;
+      (move.tags||[]).forEach(tag=>{
+        patterns[tag]=(patterns[tag]||0)+1;
+      });
+      if((key==="mistake"||key==="blunder")&&!(move.tags||[]).length)stats.missedTactics++;
+    });
+    const insights=[];
+    const total=(moves||[]).length;
+    if(total){
+      const severe=stats.mistakes+stats.blunders;
+      insights.push({
+        title:"Move consistency",description:`${total} moves analysed; ${severe} were classified as mistakes or blunders.`
+      });
+      if(stats.blunders)insights.push({
+        title:"Blunder review",description:`Review the ${stats.blunders} blunder(s) and identify the opponent's strongest reply.`
+      });
+      if(stats.best+stats.good)insights.push({
+        title:"Positive decisions",description:`${stats.best+stats.good} moves were Best or Good.`
+      });
+    }
+    const repeatedPatterns=Object.entries(patterns).filter(([,count])=>count>1).map(([pattern,count])=>({
+      pattern,count
+    }));
+    return {
+      success:true,statistics:stats,insights,repeatedPatterns
+    };
+  }
+  w.PlayerIntelligence=Object.freeze({
+    analyze
+  });
+})(window);
+</script>
+<script>(()=>{
+  "use strict";
+  const $=id=>document.getElementById(id),MATERIAL={
+    p:1,n:3,b:3,r:5,q:9,k:0
+  },clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),sigmoid=x=>1/(1+Math.exp(-x));
+  const KEYS=["best","good","inaccuracy","mistake","blunder","book"],LABELS={
+    best:"Best",good:"Good",inaccuracy:"Inaccuracy",mistake:"Mistake",blunder:"Blunder",book:"Book"
+  },ICONS={
+    best:"✓",good:"●",inaccuracy:"?!",mistake:"?",blunder:"✕",book:"♟"
+  };
+  let games=[],current=null,results=[],cursor=0,worker=null,readyPromise=null,activeResolve=null,activeScore=null,activeWDL=null,activePV=[],activeDepth=-1,activeTurn="w",analysisBusy=false,latestAnalysis=0;
+  function message(t,error=false){
+    $("importStatus").textContent=t;$("importStatus").className="status"+(error?" error":"")
+  }
+  function fallbackWDL(cp){
+    cp=clamp(Number(cp)||0,-10000,10000);const draw=clamp(Math.max(.015,.5*Math.exp(-Math.abs(cp)/350)),0,.5),share=sigmoid(cp/180);return{
+      whiteWin:(1-draw)*share,draw,blackWin:(1-draw)*(1-share),source:"fallback"
+    }
+  }
+  function normalizedWDL(cp,wdl,stm){
+    if(!wdl)return fallbackWDL(cp);let [w,d,l]=wdl.map(x=>Math.max(0,Number(x)||0)),sum=w+d+l;if(!sum)return fallbackWDL(cp);w/=sum;d/=sum;l/=sum;return stm==="w"?{
+      whiteWin:w,draw:d,blackWin:l,source:"stockfish"
+    }:{
+      whiteWin:l,draw:d,blackWin:w,source:"stockfish"
+    }
+  }
+  function getEP(wdl,stm,mover,cp){
+    const p=normalizedWDL(cp,wdl,stm);return mover==="w"?p.whiteWin+p.draw/2:p.blackWin+p.draw/2
+  }
+  function moverWDL(cp,wdl,stm,mover){
+    const p=normalizedWDL(cp,wdl,stm);return mover==="w"?{
+      win:p.whiteWin,draw:p.draw,loss:p.blackWin
+    }:{
+      win:p.blackWin,draw:p.draw,loss:p.whiteWin
+    }
+  }
+  function parsePgn(text){
+    return text.trim().split(/(?=^\s*\[Event\s)/m).map(x=>x.trim()).filter(Boolean)
+  }
+  function parseGame(pgn){
+    const g=new Chess();if(!g.load_pgn(pgn,{
+      sloppy:true
+    }))throw Error("Invalid PGN.");const headers=g.header(),sans=g.history();if(!sans.length)throw Error("No moves found.");const startFen=headers.FEN||new Chess().fen(),replay=new Chess(startFen),plies=[];sans.forEach((san,i)=>{
+      const before=replay.fen(),m=replay.move(san,{
+        sloppy:true
+      });if(!m)throw Error("Invalid move: "+san);plies.push({
+        san:m.san,uci:m.from+m.to+(m.promotion||""),color:m.color,before,after:replay.fen(),number:Math.ceil((i+1)/2)
+      })
+    });return{
+      headers,sans,plies,startFen,opening:window.PFReviewBook?.identify(sans)||null
+    }
+  }
+  async function loadText(text){
+    try{
+      if(!String(text||"").trim())throw Error("Paste or choose a PGN game first.");await (window.PFReviewBook?.ready||Promise.resolve());localStorage.setItem("pf_review_pgn",text);games=parsePgn(text).map(p=>({
+        game:parseGame(p)
+      }));if(!games.length)throw Error("No game found.");$("gamePicker").innerHTML="";games.forEach((g,i)=>{
+        const o=document.createElement("option");o.value=i;o.textContent=(g.game.headers.White||"White")+" vs "+(g.game.headers.Black||"Black")+" · "+(g.game.headers.Date||"Unknown date");$("gamePicker").appendChild(o)
+      });$("gamePickerWrap").classList.remove("hide");message(games.length+" game(s) loaded · Opening book: "+(window.PFReviewBook?.source||"fallback"))
+    }
+    catch(e){
+      message(e.message,true)
+    }
+  }
+  $("loadPgn").onclick=()=>loadText($("pgnInput").value);$("pgnFile").onchange=async e=>{
+    const f=e.target.files[0];if(f){
+      $("pgnInput").value=await f.text();loadText($("pgnInput").value)
+    }
+  };
+  $("useSelected").onclick=()=>{
+    const g=games[Number($("gamePicker").value)];if(g){
+      localStorage.setItem("pf_review_game_index",$("gamePicker").value);startGame(g.game)
+    }
+  };
+  /* Existing engine owner: no second Worker is created by stockfishAdapter.js. */
+  function ensureEngine(){
+    if(readyPromise)return readyPromise;readyPromise=new Promise((resolve,reject)=>{
+      let settled=false,timer;const fail=e=>{
+        if(settled)return;settled=true;clearTimeout(timer);readyPromise=null;if(worker){
+          worker.terminate();worker=null
+        }
+        reject(e)
+      };try{
+        worker=new Worker("engine/stockfish-19-lite-single.js")
+      }
+      catch(e){
+        fail(Error("Could not create Stockfish worker: "+e.message));return
+      }
+      timer=setTimeout(()=>fail(Error("Stockfish startup timeout. Check engine path and assets.")),45000);worker.onmessage=e=>{
+        const s=typeof e.data==="string"?e.data:(e.data&&e.data.text)||"";if(!s)return;if(s.includes("uciok")){
+          worker.postMessage("setoption name Threads value 1");worker.postMessage("setoption name Hash value 32");worker.postMessage("setoption name UCI_ShowWDL value true");worker.postMessage("isready");return
+        }
+        if(s.includes("readyok")){
+          if(!settled){
+            settled=true;clearTimeout(timer);$("engineStatus").textContent="Stockfish ready";resolve()
+          }
+          return
+        }
+        if(s.startsWith("info ")&&activeResolve){
+          const dm=s.match(/\bdepth\s+(\d+)/),dep=dm?+dm[1]:-1,sm=s.match(/\bscore (cp|mate) (-?\d+)/);if(dep>=activeDepth){
+            if(sm){
+              activeDepth=dep;const v=+sm[2],cp=sm[1]==="mate"?(v>=0?10000-Math.min(999,Math.abs(v)):-10000+Math.min(999,Math.abs(v))):v/100;activeScore=activeTurn==="w"?cp:-cp;const wm=s.match(/\bwdl\s+(\d+)\s+(\d+)\s+(\d+)/);if(wm)activeWDL=[+wm[1],+wm[2],+wm[3]]
+            }
+            const pm=s.match(/\bpv\s+(.+)$/);if(pm)activePV=pm[1].trim().split(/\s+/)
+          }
+        }
+        if(s.startsWith("bestmove ")&&activeResolve){
+          const done=activeResolve;activeResolve=null;done({
+            score:activeScore??0,wdl:activeWDL,sideToMove:activeTurn,bestMove:s.split(/\s+/)[1]||"(none)",pv:activePV.slice()
+          })
+        }
+      };worker.onerror=()=>fail(Error("Stockfish worker error. Check engine assets."));worker.postMessage("uci")
+    });return readyPromise
+  }
+  function analyzeFen(fen,depth){
+    return new Promise((resolve,reject)=>{
+      if(!worker)return reject(Error("Stockfish worker is not running."));if(activeResolve){
+        const old=activeResolve;activeResolve=null;old({
+          score:activeScore??0,wdl:activeWDL,sideToMove:activeTurn,bestMove:"(cancelled)",pv:[]
+        })
+      }
+      activeScore=null;activeWDL=null;activePV=[];activeDepth=-1;activeTurn=fen.split(" ")[1]||"w";let done=false;const timer=setTimeout(()=>{
+        if(done)return;done=true;if(activeResolve===finish)activeResolve=null;reject(Error("Analysis timeout. Try a lower depth."))
+      },65000);function finish(x){
+        if(done)return;done=true;clearTimeout(timer);resolve(x)
+      }
+      activeResolve=finish;worker.postMessage("position fen "+fen);worker.postMessage("go depth "+depth)
+    })
+  }
+  function sanFromUci(fen,uci){
+    try{
+      if(!uci||uci==="(none)"||uci==="0000")return"—";const g=new Chess(fen),m=g.move({
+        from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]||"q"
+      });return m?m.san:uci
+    }
+    catch{
+      return uci
+    }
+  }
+  function phaseOf(fen,n){
+    const g=new Chess(fen);let mat=0,q=0;g.board().flat().forEach(p=>{
+      if(p&&p.type!=="k"){
+        mat+=MATERIAL[p.type]||0;if(p.type==="q")q++
+      }
+    });if(n<=10)return"Opening";if(q===0&&mat<=13)return"Endgame";return"Middlegame"
+  }
+  function winPercent(score){
+    const cp=clamp(Math.round((Number(score)||0)*100),-1000,1000),ch=2/(1+Math.exp(-.00368208*cp))-1;return 50+50*clamp(ch,-1,1)
+  }
+  function classifyMove({
+    cpl,isBook
+  }){
+    const ordinary=window.PFReviewClassifier.classify(cpl);
+    if(isBook)return {
+      key:"book",baseKey:ordinary.key,reason:"Recognised move in the supplied PuzzleForge opening book"
+    };
+    return {
+      key:ordinary.key,baseKey:ordinary.key,reason:"Centipawn-loss classification using PuzzleForge thresholds"
+    };
+  }
+  function isOpeningBookPly(sans,ply){
+    const lines=window.PFReviewBook?.lines||[];
+    const prefix=(sans||[]).slice(0,ply).map(s=>String(s).replace(/[+#?!]+/g,"").trim());
+    return lines.some(line=>line.moves.length>=ply && line.moves.slice(0,ply).every((s,i)=>String(s).replace(/[+#?!]+/g,"").trim()===prefix[i]));
+  }
+  function materialValue(fen,color){
+    const g=new Chess(fen);let total=0;
+    g.board().flat().forEach(p=>{
+      if(p&&p.color===color)total+=MATERIAL[p.type]||0;
+    });
+    return total;
+  }
+  function moveAccuracy(a,b,color){
+    const wa=winPercent(a),wb=winPercent(b),before=color==="w"?wa:100-wa,after=color==="w"?wb:100-wb;if(after>=before)return 100;return clamp(103.1668100711649*Math.exp(-.04354415386753951*(before-after))-3.166924740191411+1,0,100)
+  }
+  function std(a){
+    if(!a.length)return .5;const m=a.reduce((x,y)=>x+y,0)/a.length;return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/a.length)
+  }
+  function gameAccuracy(moves,color){
+    if(!moves.length)return null;const scores=[moves[0].beforeScore,...moves.map(m=>m.afterScore)],wins=scores.map(winPercent),n=clamp(Math.floor((scores.length-1)/10),2,8),windows=[];for(let i=0;i+ n<=wins.length;i++)windows.push(wins.slice(i,i+n));const weights=moves.map((_,i)=>clamp(std(windows[i]||[]),.5,12)),entries=moves.map((m,i)=>({
+      a:moveAccuracy(m.beforeScore,m.afterScore,m.color),w:weights[i],c:m.color
+    })).filter(x=>x.c===color);if(!entries.length)return null;const sw=entries.reduce((s,x)=>s+x.w,0),weighted=entries.reduce((s,x)=>s+x.a*x.w,0)/(sw||1),harm=entries.some(x=>x.a<=0)?0:entries.length/entries.reduce((s,x)=>s+1/x.a,0);return clamp((weighted+harm)/2,0,100)
+  }
+  function avg(a,k){
+    return a.length?a.reduce((s,x)=>s+x[k],0)/a.length:null
+  }
+  function pct(x){
+    return x==null?"—":x.toFixed(1)+"%"
+  }
+  function performance(list,all,color){
+    if(list.length<8)return{
+      rating:null
+    };const a=gameAccuracy(all,color),c=avg(list,"cpl"),l=avg(list,"loss"),q=.55*(a/100)+.25*Math.exp(-c/100)+.20*Math.exp(-l*8);return{
+      rating:Math.round(clamp(500+q*1400,500,1900)/25)*25
+    }
+  }
+  function renderPlayerIntelligence(){
+    const api=window.PlayerIntelligence;
+    const host=$("piInsights"),patternHost=$("piPatterns");
+    if(!host||!patternHost)return;
+    if(!api||typeof api.analyze!=="function"){
+      host.textContent="Player Intelligence module not loaded. Check built-in Player Intelligence.";
+      patternHost.textContent="Unavailable.";
+      return;
+    }
+    /* The supplied module reads classification/type/category. The review engine
+   stores the canonical label in classificationKey, so map it here. */
+    const input=results.map(m=>({
+      ...m,classification:m.classificationKey||m.classification
+    }));
+    const report=api.analyze(input);
+    if(!report||!report.success){
+      host.textContent=report?.error||"Could not analyse player patterns.";
+      patternHost.textContent="Unavailable.";
+      return;
+    }
+    const s=report.statistics||{
+    };
+    const values={
+      piBlunders:s.blunders,piMistakes:s.mistakes,piInaccuracies:s.inaccuracies,piBest:s.best,piGood:s.good,piMissedTactics:s.missedTactics
+    };
+    Object.entries(values).forEach(([id,value])=>{
+      const el=$(id);if(el)el.textContent=Number(value)||0;
+    });
+    host.innerHTML="";
+    (report.insights||[]).forEach(item=>{
+      const card=document.createElement("p");
+      const title=document.createElement("strong");
+      title.textContent=(item.title||"Insight")+" — ";
+      card.appendChild(title);
+      card.appendChild(document.createTextNode(item.description||""));
+      host.appendChild(card);
+    });
+    if(!(report.insights||[]).length)host.textContent="No insights available yet.";
+    patternHost.innerHTML="";
+    const patterns=report.repeatedPatterns||[];
+    if(!patterns.length){
+      patternHost.textContent="No repeated patterns detected in this game.";return;
+    }
+    patterns.forEach(item=>{
+      const p=document.createElement("p");
+      p.textContent=String(item.pattern)+" · "+item.count+" occurrence(s)";
+      patternHost.appendChild(p);
+    });
+  }
+  function renderSummary(){
+    const w=results.filter(m=>m.color==="w"),b=results.filter(m=>m.color==="b"),wa=gameAccuracy(results,"w"),ba=gameAccuracy(results,"b"),wc=avg(w,"cpl"),bc=avg(b,"cpl"),wr=performance(w,results,"w"),br=performance(b,results,"b");$("whiteAccuracy").textContent=pct(wa);$("blackAccuracy").textContent=pct(ba);$("whiteCPL").textContent=wc==null?"—":wc.toFixed(1)+" cp";$("blackCPL").textContent=bc==null?"—":bc.toFixed(1)+" cp";$("whiteRating").textContent=wr.rating??"—";$("blackRating").textContent=br.rating??"—";
+    KEYS.forEach(k=>{
+      const cap=k[0].toUpperCase()+k.slice(1);
+      const wc=w.filter(m=>m.classificationKey===k).length;
+      const bc=b.filter(m=>m.classificationKey===k).length;
+      const all=wc+bc;
+      $("wCount"+cap).textContent=wc;
+      $("bCount"+cap).textContent=bc;
+      $("allCount"+cap).textContent=all;
+    });
+    ["Opening","Middlegame","Endgame"].forEach(phase=>{
+      const key=phase.toLowerCase();
+      const phaseMoves=results.filter(m=>m.phase===phase);
+      ["w","b"].forEach(side=>{
+        const value=gameAccuracy(phaseMoves,side);
+        const sideName=side==="w"?"White":"Black";
+        $(key+sideName+"Accuracy").textContent=pct(value);
+        $(key+sideName+"Bar").style.width=(value??0)+"%";
+      });
+    });
+    $("advancedWhiteCPL").textContent=wc==null?"—":wc.toFixed(1)+" cp";$("advancedBlackCPL").textContent=bc==null?"—":bc.toFixed(1)+" cp";const wl=avg(w,"loss"),bl=avg(b,"loss");$("whiteEPL").textContent=wl==null?"—":(wl*100).toFixed(2)+" pp";$("blackEPL").textContent=bl==null?"—":(bl*100).toFixed(2)+" pp";$("whiteMovesAnalysed").textContent=w.length;$("blackMovesAnalysed").textContent=b.length;$("whiteBestRate").textContent=w.length?(100*w.filter(m=>m.baseClassificationKey==="best").length/w.length).toFixed(1)+"%":"—";$("blackBestRate").textContent=b.length?(100*b.filter(m=>m.baseClassificationKey==="best").length/b.length).toFixed(1)+"%":"—";$("totalMoves").textContent=results.length;
+    const custom=side=>{
+      const x=window.PFReviewAccuracy?.fromLosses?.(results.filter(m=>m.color===side).map(m=>m.cpl));return Number.isFinite(x)?x:null
+    };$("pfWhiteAccuracy").textContent=custom("w")==null?"—":custom("w").toFixed(1)+"%";$("pfBlackAccuracy").textContent=custom("b")==null?"—":custom("b").toFixed(1)+"%";
+    renderPlayerIntelligence();
+  }
+  function renderMoves(){
+    const box=$("moveList");box.innerHTML="";results.forEach((m,i)=>{
+      const b=document.createElement("button");b.className="move"+(i===cursor-1?" current":"");b.textContent=(ICONS[m.classificationKey]||"•")+" "+m.san;b.title=m.classification+" · "+m.cpl.toFixed(1)+" cp loss";b.onclick=()=>renderMove(i+1);box.appendChild(b)
+    })
+  }
+  function renderGraph(){
+    const n=Math.max(1,results.length),pts=results.map((m,i)=>((i+1)/n*600)+","+(70-clamp(m.afterScore,-6,6)*10));$("graphLine").setAttribute("points",pts.join(" "));const x=cursor/n*600;$("graphCursor").setAttribute("x1",x);$("graphCursor").setAttribute("x2",x)
+  }
+  function point(s){
+    return{
+      x:(s.charCodeAt(0)-97+.5)*100,y:(8-Number(s[1])+.5)*100
+    }
+  }
+  function renderArrow(uci){
+    const l=$("bestArrow");if(!uci||uci==="—"||uci==="(none)"||uci==="0000"){
+      l.setAttribute("opacity","0");return
+    }
+    const a=point(uci.slice(0,2)),b=point(uci.slice(2,4));l.setAttribute("x1",a.x);l.setAttribute("y1",a.y);l.setAttribute("x2",b.x);l.setAttribute("y2",b.y);l.setAttribute("opacity",".9")
+  }
+  function renderBoard(fen,m){
+    const g=new Chess(fen),el=$("board");el.innerHTML="";g.board().forEach((rank,r)=>rank.forEach((p,c)=>{
+      const s=document.createElement("div"),sq="abcdefgh"[c]+(8-r);s.className="sq "+((r+c)%2?"dark":"light");if(m&&sq===m.uci.slice(0,2))s.classList.add("last-from");if(m&&sq===m.uci.slice(2,4))s.classList.add("last-to");if(p){
+        const img=document.createElement("img");img.src="pieces/"+p.color+p.type.toUpperCase()+".svg";img.alt=p.color+" "+p.type;s.appendChild(img)
+      }
+      if(m&&sq===m.uci.slice(2,4)){
+        const b=document.createElement("span");b.className="sq-badge sq-badge-"+m.classificationKey;b.textContent=ICONS[m.classificationKey]||"•";s.appendChild(b)
+      }
+      if(c===0){
+        const q=document.createElement("span");q.className="coord";q.textContent=8-r;s.appendChild(q)
+      }
+      if(r===7){
+        const q=document.createElement("span");q.className="coord";q.style.top="auto";q.style.bottom="2px";q.style.left="auto";q.style.right="2px";q.textContent="abcdefgh"[c];s.appendChild(q)
+      }
+      el.appendChild(s)
+    }))
+  }
+  function renderProbability(cp,wdl,stm){
+    const p=normalizedWDL(cp,wdl,stm);$("whiteProb").textContent="White: "+(p.whiteWin*100).toFixed(1)+"%";$("drawProb").textContent="Draw: "+(p.draw*100).toFixed(1)+"%";$("blackProb").textContent="Black: "+(p.blackWin*100).toFixed(1)+"%";$("evalWhite").style.width=((p.whiteWin+p.draw/2)*100)+"%"
+  }
+  function playUci(fen,uci){
+    try{
+      if(!uci||uci==="(none)"||uci==="0000")return null;const g=new Chess(fen),move=g.move({
+        from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]||"q"
+      });return move?{
+        game:g,move,fen:g.fen()
+      }:null
+    }
+    catch{
+      return null
+    }
+  }
+  function sanLine(fen,pv,max=6){
+    const g=new Chess(fen),out=[];for(const u of (pv||[]).slice(0,max)){
+      const m=g.move({
+        from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]||"q"
+      });if(!m)break;out.push(m.san)
+    }
+    return out.join(" ")
+  }
+  /* Tactical Event Intelligence — position-delta detector.
+   It reports concrete board facts and labels uncertain captures conservatively. */
+  function pfSquare(r,c){
+    return "abcdefgh"[c]+(8-r)
+  }
+  function pfPieceName(p){
+    return ({
+      p:"pawn",n:"knight",b:"bishop",r:"rook",q:"queen",k:"king"
+    })[p.type]||p.type
+  }
+  function pfAttacks(board,r,c,tr,tc){
+    const p=board[r]?.[c];if(!p)return false;
+    const dr=tr-r,dc=tc-c,ar=Math.abs(dr),ac=Math.abs(dc),t=p.type;
+    if(t==="p")return dr===(p.color==="w"?-1:1)&&ac===1;
+    if(t==="n")return (ar===2&&ac===1)||(ar===1&&ac===2);
+    if(t==="k")return Math.max(ar,ac)===1;
+    if(t==="b"&&ar!==ac)return false;
+    if(t==="r"&&dr!==0&&dc!==0)return false;
+    if(t==="q"&&!(dr===0||dc===0||ar===ac))return false;
+    if(t!=="b"&&t!=="r"&&t!=="q")return false;
+    const sr=Math.sign(dr),sc=Math.sign(dc);let rr=r+sr,cc=c+sc;
+    while(rr!==tr||cc!==tc){
+      if(board[rr]?.[cc])return false;rr+=sr;cc+=sc
+    }
+    return true;
+  }
+  function pfAttackers(board,tr,tc,color){
+    const a=[];for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=board[r][c];if(p&&p.color===color&&pfAttacks(board,r,c,tr,tc))a.push({
+        r,c,p
+      })
+    }
+    return a
+  }
+  function pfScanTactics(fen){
+    const g=new Chess(fen),board=g.board(),events=[];
+    const add=(key,text)=>events.push({
+      key,text
+    });
+    const dirs=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+    const val={
+      p:1,n:3,b:3,r:5,q:9,k:100
+    };
+    const kings={
+      w:null,b:null
+    };
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(board[r][c]?.type==="k")kings[board[r][c].color]={
+      r,c
+    };
+    // Absolute pins: a friendly piece is the sole blocker between its king and an enemy slider.
+              for(const color of ["w","b"]){
+      const k=kings[color];if(!k)continue;
+      for(const [dr,dc] of dirs){
+        let r=k.r+dr,c=k.c+dc,blocker=null;
+        while(r>=0&&r<8&&c>=0&&c<8){
+          const p=board[r][c];if(p){
+            if(!blocker){
+              if(p.color!==color)break;blocker={
+                r,c,p
+              }
+            }
+            else {
+              if(p.color!==color){
+                const straight=dr===0||dc===0,slider=p.type==="q"||(straight&&p.type==="r")||(!straight&&p.type==="b");if(slider)add("pin-"+pfSquare(blocker.r,blocker.c),`The ${pfPieceName(blocker.p)} on ${pfSquare(blocker.r,blocker.c)} is absolutely pinned to its king by the enemy ${pfPieceName(p)} on ${pfSquare(r,c)}.`)
+              }
+              break;
+            }
+          }
+          r+=dr;c+=dc;
+        }
+      }
+    }
+    // Forks: one piece attacks two or more valuable enemy targets at once.
+              for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=board[r][c];if(!p)continue;const targets=[];
+      for(let tr=0;tr<8;tr++)for(let tc=0;tc<8;tc++){
+        const q=board[tr][tc];if(q&&q.color!==p.color&&(q.type==="k"||val[q.type]>=5)&&pfAttacks(board,r,c,tr,tc))targets.push({
+          q,r:tr,c:tc
+        })
+      }
+      if(targets.length>=2){
+        const names=targets.map(x=>`${pfPieceName(x.q)} on ${pfSquare(x.r,x.c)}`);add("fork-"+pfSquare(r,c),`${p.color==="w"?"White":"Black"}’s ${pfPieceName(p)} on ${pfSquare(r,c)} forks ${names.join(" and ")}.`)
+      }
+    }
+    // Skewers: a king/queen is attacked first, with another enemy piece behind it on the same ray.
+              for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=board[r][c];if(!p||!["b","r","q"].includes(p.type))continue;
+      for(const [dr,dc] of dirs){
+        if(p.type==="b"&&(dr===0||dc===0))continue;if(p.type==="r"&&dr!==0&&dc!==0)continue;let rr=r+dr,cc=c+dc,first=null;
+        while(rr>=0&&rr<8&&cc>=0&&cc<8){
+          const q=board[rr][cc];if(q){
+            if(q.color===p.color)break;if(!first){
+              first={
+                q,r:rr,c:cc
+              };if(!["k","q"].includes(q.type))break;
+            }
+            else{
+              add("skewer-"+pfSquare(r,c)+"-"+pfSquare(first.r,first.c),`${p.color==="w"?"White":"Black"}’s ${pfPieceName(p)} on ${pfSquare(r,c)} skewers the ${pfPieceName(first.q)} on ${pfSquare(first.r,first.c)}; the ${pfPieceName(q)} on ${pfSquare(rr,cc)} is behind it.`);break;
+            }
+          }
+          rr+=dr;cc+=dc;
+        }
+      }
+    }
+    // Hanging: attacked and has no same-side defenders. This is a tactical warning, not a guaranteed capture.
+              for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=board[r][c];if(!p||p.type==="k"||p.type==="p")continue;const enemy=pfAttackers(board,r,c,p.color==="w"?"b":"w"),friends=pfAttackers(board,r,c,p.color);if(enemy.length&&friends.length===0){
+        const attacker=enemy[0];add("hanging-"+pfSquare(r,c),`${p.color==="w"?"White":"Black"}’s ${pfPieceName(p)} on ${pfSquare(r,c)} is attacked by the ${pfPieceName(attacker.p)} on ${pfSquare(attacker.r,attacker.c)} and has no defender (hanging piece). Check whether the capture is safe.`)
+      }
+    }
+    // Discovered attacks: a new slider attack appears after the move, from a piece that did not move.
+              return events;
+  }
+  function pfTacticalExplanation(m){
+    const before=pfScanTactics(m.before),after=pfScanTactics(m.after),old=new Set(before.map(x=>x.key));
+    const fresh=after.filter(x=>!old.has(x.key)),out=[];
+    const g=new Chess(m.after),last=m.playedMove, mover=m.color;
+    // A discovered attack is a newly opened slider line from a piece other than the mover.
+              const beforeBoard=new Chess(m.before).board(),afterBoard=g.board(),from=last?.from,to=last?.to;
+    if(from&&to){
+      for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+        const target=afterBoard[r][c];if(!target||target.color===mover||target.type==="p")continue;
+        const now=pfAttackers(afterBoard,r,c,mover),was=pfAttackers(beforeBoard,r,c,mover);
+        const prior=new Set(was.map(a=>pfSquare(a.r,a.c)));
+        const opened=now.find(a=>pfSquare(a.r,a.c)!==to&&pfSquare(a.r,a.c)!==from&&!prior.has(pfSquare(a.r,a.c))&&["b","r","q"].includes(a.p.type));
+        if(opened)fresh.push({
+          key:"discovered-"+pfSquare(opened.r,opened.c)+"-"+pfSquare(r,c),text:`Moving the piece from ${from} uncovered a ${pfPieceName(opened.p)} attack from ${pfSquare(opened.r,opened.c)} onto the ${pfPieceName(target)} on ${pfSquare(r,c)} (discovered attack).`
+        });
+      }
+    }
+    if(last?.san?.includes("#")||g.in_checkmate())out.push({
+      kind:"mate",text:`Checkmate. ${m.color==="w"?"White":"Black"} wins.`
+    });
+    else if(last?.san?.includes("+"))out.push({
+      kind:"check",text:`Check. The ${m.color==="w"?"White":"Black"} move gives check to the opponent's king.`
+    });
+    if(last?.captured)out.push({
+      kind:"capture",text:`The ${({p:"pawn",n:"knight",b:"bishop",r:"rook",q:"queen",k:"king"})[last.captured]} on ${last.to} was captured.`
+    });
+    fresh.forEach(e=>out.push({
+      kind:e.key.split("-")[0],text:e.text
+    }));
+    if(m.replyLine&&m.replyLine.includes("#"))out.push({
+      kind:"mate-threat",text:`The engine continuation contains checkmate: ${m.replyLine}. This is an engine-line mate, not merely a visual threat.`
+    });
+    if(!out.length){
+      if(g.in_check())out.push({
+        kind:"check",text:"The opponent is currently in check."
+      });
+      else out.push({
+        kind:"quiet",text:"No new fork, pin, skewer or undefended major piece was confirmed by comparing the position before and after this move."
+      });
+    }
+    return out;
+  }
+  function tacticalInfo(move,before,after,bestUci){
+    const tags=[];if(move?.captured)tags.push("Capture");if(move?.san?.includes("+"))tags.push("Check");if(move?.san?.includes("#"))tags.push("Checkmate");if(move?.promotion)tags.push("Promotion");const external=window.PFReviewTactics?.inspect?.(move,before,after,bestUci);if(Array.isArray(external))tags.push(...external);else if(external?.tags)tags.push(...external.tags);return [...new Set(tags)]
+  }
+  function explain(m){
+    const side=m.color==="w"?"White":"Black";
+    const moveName=m.playedMove?pfPieceName(m.playedMove.piece):"piece";
+    const parts=[`${side} played ${m.san}, moving the ${moveName} from ${m.playedMove?.from||"its square"} to ${m.playedMove?.to||"its destination"}.`];
+    if(m.classificationKey==="book") parts.push("This move follows a recognised opening line.");
+    else parts.push(`Move quality: ${m.classification.toLowerCase()}.`);
+    if(m.bestMove&&m.bestMove!=="—"&&m.bestMove!==m.san) parts.push(`The strongest engine choice was ${m.bestMove}${m.replySan?`, with ${m.replySan} as a principal reply`:""}.`);
+    else if(m.bestMove===m.san) parts.push("The played move matches the engine’s top choice.");
+    if(Number.isFinite(m.cpl)) parts.push(`Estimated evaluation loss: ${m.cpl.toFixed(1)} centipawns.`);
+    if(m.tags?.length) parts.push(`Move features: ${[...new Set(m.tags)].join(", ")}.`);
+    if(m.replyLine) parts.push(`Principal continuation: ${m.replyLine}.`);
+    if(m.brilliantCandidate) parts.push("This is a potential tactical sacrifice candidate.");
+    return parts.join(" ");
+  }
+  function renderMove(ply){
+    if(!current)return;cursor=clamp(ply,0,current.plies.length);const fen=cursor?current.plies[cursor-1].after:current.startFen,m=cursor?results[cursor-1]:null;renderBoard(fen,m);renderArrow(m&&m.bestUci!==m.uci?m.bestUci:null);const ev=m?m.afterScore:0;$("evalScore").textContent=(ev>0?"+":"")+ev.toFixed(2)+" · White perspective";$("moveCount").textContent=cursor?"Ply "+cursor:"Start";renderProbability(ev,m?.afterWDLRaw,m?.afterSideToMove||"w");$("firstMove").disabled=$("prevMove").disabled=cursor===0;$("nextMove").disabled=$("lastMove").disabled=cursor>=current.plies.length;
+    if(m){
+      $("reviewHeading").textContent=m.number+". "+m.san;const box=$("moveDetail");box.innerHTML="";const badge=document.createElement("div");badge.className="classification-badge badge-"+m.classificationKey;const badgeIcon=document.createElement("span");badgeIcon.className="classification-icon";badgeIcon.textContent=ICONS[m.classificationKey]||"•";badge.appendChild(badgeIcon);badge.appendChild(document.createTextNode(m.classification));box.appendChild(badge);const d=document.createElement("div");d.className="detail-text";const p=document.createElement("p");p.textContent=explain(m);d.appendChild(p);
+      const what=document.createElement("section");what.className="what-happened";
+      const whatTitle=document.createElement("h3");whatTitle.textContent="What Happened?";
+      what.appendChild(whatTitle);
+      const explanationList=document.createElement("ul");
+      const tacticalEvents=pfTacticalExplanation(m);
+      const explanationFacts=tacticalEvents.map(x=>x.text);
+      if(m.playedMove){
+        const movedPiece=pfPieceName(m.playedMove.piece);
+        explanationFacts.unshift(`${m.color==="w"?"White":"Black"} moved the ${movedPiece} from ${m.playedMove.from} to ${m.playedMove.to}.`);
+      }
+      if(m.bestMove&&m.bestMove!==m.san){
+        explanationFacts.push(`The engine’s preferred move was ${m.bestMove}${m.replySan?`; the principal reply after the played move is ${m.replySan}`:""}.`);
+      }
+      if(m.replyLine&&m.replyLine!==m.replySan){
+        explanationFacts.push(`Main continuation: ${m.replyLine}.`);
+      }
+      if(!explanationFacts.length) explanationFacts.push("No check, capture, newly created pin, fork, skewer, discovered attack or hanging major piece was confirmed in the position change.");
+      explanationFacts.forEach((fact,i)=>{
+        const li=document.createElement("li");li.textContent=fact;li.dataset.event=tacticalEvents[i]?.kind||"move";explanationList.appendChild(li)
+      });
+      what.appendChild(explanationList);d.appendChild(what);
+      const fields=[["Played Move",m.san],["Best Engine Move",m.bestMove],["Phase",m.phase],["Centipawn loss",m.cpl.toFixed(1)+" cp"],["Mover expected points before",((m.winProbabilityBefore??0)*100).toFixed(1)+"%"],["Mover expected points after",((m.winProbabilityAfter??0)*100).toFixed(1)+"%"],["Expected-points change",(((m.winProbabilityAfter??0)-(m.winProbabilityBefore??0))*100).toFixed(1)+" percentage points"],["Classification basis",m.classificationReason||"Centipawn-loss band"],["PuzzleForge accuracy",m.accuracy.toFixed(1)+"%"],["Expected-points loss",(m.loss*100).toFixed(2)+" pp"],["Tactical tags",m.tags.join(", ")||"None detected"],["Opponent threat / strongest reply",m.replySan||"No forcing reply recorded"],["Engine continuation",m.replyLine||"Not recorded"],["Evaluation before",m.beforeScore.toFixed(2)],["Evaluation after",m.afterScore.toFixed(2)]];fields.forEach(([a,b])=>{
+        const q=document.createElement("p"),strong=document.createElement("strong");strong.textContent=a+": ";q.append(strong,document.createTextNode(b));d.appendChild(q)
+      });box.appendChild(d)
+    }
+    else{
+      $("reviewHeading").textContent="Starting Position";$("moveDetail").textContent="Starting position. Analyse the game to see move classifications and engine recommendations."
+    }
+    renderMoves();renderGraph()
+  }
+  $("firstMove").onclick=()=>renderMove(0);$("prevMove").onclick=()=>renderMove(cursor-1);$("nextMove").onclick=()=>renderMove(cursor+1);$("lastMove").onclick=()=>renderMove(current.plies.length);
+  async function analyse(){
+    if(!current||analysisBusy)return;analysisBusy=true;const run=++latestAnalysis;$("analyseBtn").disabled=true;results=[];cursor=0;renderSummary();renderMoves();renderGraph();renderMove(0);$("analysisProgress").classList.remove("error");$("analysisProgress").textContent="Starting Stockfish...";
+    try{
+      await ensureEngine();const depth=Number($("depthSelect").value);let before=await analyzeFen(current.startFen,depth);for(let i=0;i<current.plies.length;i++){
+        if(run!==latestAnalysis)break;const p=current.plies[i],bestUci=before.bestMove,bestSan=sanFromUci(p.before,bestUci),after=await analyzeFen(p.after,depth);if(run!==latestAnalysis)break;
+        const beforeEP=getEP(before.wdl,before.sideToMove,p.color,before.score),afterEP=getEP(after.wdl,after.sideToMove,p.color,after.score),loss=clamp(beforeEP-afterEP,0,1),bp=p.color==="w"?before.score:-before.score,ap=p.color==="w"?after.score:-after.score,cpl=clamp((bp-ap)*100,0,10000),phase=phaseOf(p.before,p.number),played=playUci(p.before,p.uci),tags=tacticalInfo(played?.move,bp,ap,bestUci),reply=playUci(p.after,after.bestMove),isBestMove=!!bestUci&&bestUci===p.uci,bookMove=isOpeningBookPly(current.sans||current.plies.map(x=>x.san),i+1),beforeMoverEP=beforeEP,afterMoverEP=afterEP,classificationInfo=classifyMove({
+          cpl,isBook:bookMove
+        }),classificationKey=classificationInfo.key,classification=LABELS[classificationKey]||"Unrated",brilliantCandidate=false;
+        const item={
+          ...p,playedMove:played?.move||null,replyMove:reply?.move||null,beforeScore:before.score,afterScore:after.score,beforeWDL:moverWDL(before.score,before.wdl,before.sideToMove,p.color),afterWDL:moverWDL(after.score,after.wdl,after.sideToMove,p.color),afterWDLRaw:after.wdl,afterSideToMove:after.sideToMove,bestMove:bestSan,bestUci,loss,cpl,phase,classification,classificationKey,baseClassificationKey:classificationInfo.baseKey,classificationReason:classificationInfo.reason,isBook:bookMove,isBest:isBestMove,winProbabilityBefore:beforeMoverEP,winProbabilityAfter:afterMoverEP,accuracy:moveAccuracy(before.score,after.score,p.color),tags,brilliantCandidate,replySan:reply?.move.san||"",replyLine:sanLine(p.after,after.pv,6)
+        };
+        results.push(item);before=after;$("analysisProgress").textContent="Analysed "+(i+1)+" / "+current.plies.length+" · "+classification;renderSummary();renderMoves();renderGraph();if(cursor>0)renderMove(cursor)
+      }
+      if(run===latestAnalysis){
+        try{
+          localStorage.setItem("pf_review_results",JSON.stringify({
+            index:Number($("gamePicker").value)||0,results,depth
+          }))
+        }
+        catch(e){
+        }
+        $("analysisProgress").textContent="Analysis complete."; $("engineStatus").textContent="Analysis complete.";renderSummary();renderMoves();renderGraph();renderMove(cursor)
+      }
+    }
+    catch(e){
+      if(run===latestAnalysis){
+        $("analysisProgress").textContent=e.message;$("analysisProgress").classList.add("error")
+      }
+    }
+    finally{
+      analysisBusy=false;$("analyseBtn").disabled=false
+    }
+  }
+  $("analyseBtn").onclick=analyse;
+  function startGame(game){
+    latestAnalysis++;current=game;results=[];cursor=0;$("reviewSection").classList.remove("hide");$("whiteName").textContent=game.headers.White||"White";$("blackName").textContent=game.headers.Black||"Black";$("gameResult").textContent=game.headers.Result||"Game";const o=game.opening;$("openingInfo").textContent=o?o.eco+" · "+o.name+" · Recognized line: "+o.moves.join(" "):"Opening not found in the current PuzzleForge opening book."; $("analysisProgress").textContent="";$("analysisProgress").classList.remove("error");renderSummary();renderMoves();renderGraph();renderMove(0);$("reviewSection").scrollIntoView({
+      behavior:"smooth"
+    });message("Game loaded successfully. Press Analyse Game to begin.")
+  }
+  async function restoreLastReview(){
+    try{
+      const saved=localStorage.getItem("pf_review_pgn");if(!saved)return;await loadText(saved);const idx=clamp(Number(localStorage.getItem("pf_review_game_index"))||0,0,Math.max(0,games.length-1));$("gamePicker").value=String(idx);if(!games[idx])return;startGame(games[idx].game);const cached=JSON.parse(localStorage.getItem("pf_review_results")||"null");if(cached&&cached.index===idx&&Array.isArray(cached.results)&&cached.results.length===games[idx].game.plies.length){
+        results=cached.results;renderSummary();renderMoves();renderGraph();renderMove(0);$("analysisProgress").textContent="Restored previous analysis from this browser.";$("engineStatus").textContent="Previous analysis restored · depth "+cached.depth
+      }
+      message("Previous game restored.")
+    }
+    catch(e){
+      console.warn("Restore failed",e)
+    }
+  }
+  /* Cached-result integration point for gameAnalyzer.js: no second engine pass. */
+  window.PFReviewIntegration={
+    engine:{
+      ready:ensureEngine,evaluate:analyzeFen
+    },modules:{
+      book:window.PFReviewBook,classifier:window.PFReviewClassifier,tactics:window.PFReviewTactics,explanation:window.PFReviewExplanation,accuracy:window.PFReviewAccuracy,stockfishAdapter:window.PFStockfishAdapter,gameAnalyzer:window.PFGameAnalyzer,playerIntelligence:window.PlayerIntelligence
+    },getResults:()=>results.slice(),getPlayerInsights:()=>window.PlayerIntelligence?.analyze?.(results.map(m=>({
+      ...m,classification:m.classificationKey||m.classification
+    })))
+  };
+  window.addEventListener("DOMContentLoaded",()=>{
+    restoreLastReview();
+  });
+  /* Explicit module registry: all seven uploaded modules are embedded in this standalone file. */
+  window.PuzzleForgeReviewModules=Object.freeze({
+    openingBook:window.PFReviewBook,
+    moveClassifier:window.PFReviewClassifier,
+    tacticalDetector:window.PFReviewTactics,
+    moveExplainer:window.PFReviewExplanation,
+    accuracyCalculator:window.PFReviewAccuracy,
+    stockfishAdapter:window.PFStockfishAdapter,
+    gameAnalyzer:window.PFGameAnalyzer
+  });
+})();
+</script>
+</body></html>
