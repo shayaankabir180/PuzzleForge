@@ -1,0 +1,812 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090b10">
+<title>PuzzleForge — Chess Training</title>
+
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#090b10;
+  --sidebar:#080a0f;
+  --panel:#171b24;
+  --line:#292f3b;
+  --text:#f4f5f7;
+  --muted:#9299a8;
+  --active:#202631;
+  --gold:#b6a05a;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font:15px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+}
+
+.app{
+  min-height:100vh;
+  display:flex;
+}
+
+.sidebar{
+  width:260px;
+  flex:0 0 260px;
+  background:var(--sidebar);
+  border-right:1px solid var(--line);
+  padding:28px 16px;
+}
+
+.brand{
+  display:block;
+  padding:0 8px 30px;
+  font-size:20px;
+  font-weight:750;
+  letter-spacing:normal;
+  text-decoration:none;
+  color:white;
+}
+
+.nav{
+  display:grid;
+  gap:7px;
+}
+
+.nav a{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  min-height:46px;
+  padding:0 12px;
+  border-radius:9px;
+  color:#e5e7eb;
+  text-decoration:none;
+  font-weight:500;
+}
+
+.nav a:hover,
+.nav a.active{
+  background:var(--active);
+  color:#fff;
+}
+
+.nav svg{
+  height:19px;
+  width:19px;
+  stroke:currentColor;
+  fill:none;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  flex:none;
+}
+
+.main{
+  flex:1;
+  min-width:0;
+  padding:38px clamp(20px,4vw,56px);
+  max-width:1500px;
+  margin:0 auto;
+}
+
+.topline{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:28px;
+}
+
+.eyebrow{
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--muted);
+  font-weight:650;
+}
+
+.heading{
+  font-size:clamp(25px,3vw,34px);
+  letter-spacing:-1px;
+  margin:5px 0 0;
+}
+
+.sub{
+  color:var(--muted);
+  margin:7px 0 0;
+}
+
+/* Homepage navigation cards */
+
+.home-links{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+  margin-top:20px;
+}
+
+.session-card{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  min-height:145px;
+  text-decoration:none;
+  color:var(--text);
+  background:#10141d;
+  border:1px solid var(--line);
+  border-radius:11px;
+  padding:20px;
+  transition:border-color .2s,transform .2s;
+}
+
+.session-card:hover{
+  border-color:var(--gold);
+  transform:translateY(-2px);
+}
+
+.session-card h3{
+  font-size:15px;
+  margin:0 0 8px;
+  letter-spacing:.4px;
+}
+
+.session-card p{
+  margin:0 0 13px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.session-card span{
+  color:#c9b575;
+  font-size:12px;
+  font-weight:700;
+}
+
+/* Game Review card */
+
+.game-review-card{
+  border-color:var(--line);
+  background:#10141d;
+}
+
+.game-review-card:hover{
+  border-color:var(--gold);
+}
+
+/* Authentication */
+
+.auth-actions{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.auth-btn{
+  border:1px solid #454c59;
+  background:#141821;
+  color:var(--text);
+  border-radius:8px;
+  padding:9px 13px;
+  font:inherit;
+  font-size:12px;
+  font-weight:650;
+  cursor:pointer;
+}
+
+.auth-btn.primary{
+  background:var(--gold);
+  border-color:var(--gold);
+  color:#111;
+}
+
+.auth-btn:hover{filter:brightness(1.12)}
+
+.auth-btn:disabled{
+  opacity:.6;
+  cursor:wait;
+}
+
+.auth-user{
+  font-size:12px;
+  color:var(--muted);
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.auth-overlay{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  background:#000b;
+  display:none;
+  place-items:center;
+  padding:18px;
+}
+
+.auth-overlay.open{display:grid}
+
+.auth-dialog{
+  width:min(100%,420px);
+  background:#171b24;
+  border:1px solid #343b48;
+  border-radius:16px;
+  padding:23px;
+  box-shadow:0 20px 70px #0009;
+}
+
+.auth-dialog h2{
+  font-size:20px;
+  margin:0 0 5px;
+}
+
+.auth-dialog>p{
+  font-size:13px;
+  color:var(--muted);
+  margin:0 0 18px;
+}
+
+.auth-form-actions{
+  display:grid;
+  gap:9px;
+  margin-top:17px;
+}
+
+.auth-form-actions button{
+  width:100%;
+  padding:11px;
+}
+
+.auth-message{
+  font-size:12px;
+  min-height:18px;
+  margin-top:12px;
+  color:#a9c99b;
+}
+
+.auth-close{
+  float:right;
+  background:none;
+  border:0;
+  color:var(--muted);
+  font-size:22px;
+  cursor:pointer;
+}
+
+
+/* Visitor counter */
+.visitor-counter-card{
+  margin-top:18px;
+  padding:17px 20px;
+  background:#10141d;
+  border:1px solid var(--line);
+  border-radius:11px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.visitor-counter-card h3{
+  margin:0;
+  font-size:14px;
+  font-weight:650;
+}
+.visitor-counter-card p{
+  margin:4px 0 0;
+  color:var(--muted);
+  font-size:12px;
+}
+.visitor-counter-card .counterapi{
+  min-height:32px;
+  color:var(--gold);
+  font-size:18px;
+  font-weight:750;
+}
+
+@media(max-width:900px){
+  .sidebar{
+    width:228px;
+    flex-basis:228px;
+  }
+}
+
+@media(max-width:620px){
+  .app{display:block}
+
+  .sidebar{
+    width:auto;
+    border-right:0;
+    border-bottom:1px solid var(--line);
+    padding:16px 14px;
+  }
+
+  .brand{
+    padding:0 4px 14px;
+    font-size:18px;
+  }
+
+  .nav{
+    display:flex;
+    overflow-x:auto;
+    gap:6px;
+    padding-bottom:2px;
+  }
+
+  .nav a{
+    white-space:nowrap;
+    min-height:40px;
+    padding:0 11px;
+    font-size:12px;
+  }
+
+  .nav svg{
+    width:16px;
+    height:16px;
+  }
+
+  .main{padding:25px 15px}
+
+  .topline{
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+
+  .auth-actions{justify-content:flex-start}
+  .auth-user{max-width:130px}
+
+  .home-links{grid-template-columns:1fr}
+
+  .session-card{min-height:125px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-label="Main navigation">
+
+    <a class="brand" href="index.html">♟ PuzzleForge</a>
+
+    <nav class="nav">
+
+      <a href="dashboard.html">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="3" width="8" height="8" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="5" rx="1.5"/>
+          <rect x="14" y="11" width="7" height="10" rx="1.5"/>
+          <rect x="3" y="14" width="8" height="7" rx="1.5"/>
+        </svg>
+        <span>Dashboard</span>
+      </a>
+
+      <a href="puzzle-arena.html">
+        <svg viewBox="0 0 24 24">
+          <path d="M8 20h8M9 17h6l1 3H8l1-3Z"/>
+          <path d="M8 17c.3-2.1 1.4-3.4 3-4.2V10H9V7h2V4h2v3h2v3h-2v2.8c1.6.8 2.7 2.1 3 4.2"/>
+        </svg>
+        <span>Puzzle Contriving</span>
+      </a>
+
+      <!-- Woodpecker Bird Icon -->
+      <a href="woodpecker.html">
+        <svg viewBox="0 0 24 24"
+             aria-hidden="true">
+
+          <!-- Tree trunk -->
+          <path d="M20 3V21"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"/>
+
+          <!-- Woodpecker body, head and beak -->
+          <path d="
+            M17.8 9.1
+            L21.5 8
+            L17.7 7
+            L17.2 4.2
+            L15.5 6.3
+            L12.7 5.7
+            L14 8
+            C12.2 8.9 10.9 10.5 10.8 12.3
+            C10.7 14.2 12.1 15.5 14.1 15.7
+            L13 19
+            L15.2 19
+            L16.5 15.5
+            C18.1 14.7 18.8 12.9 18.3 11.3
+            Z"
+            fill="currentColor"
+            stroke="none"/>
+
+          <!-- Wing detail -->
+          <path d="M12.5 11.3
+                   Q15.5 10.3 17 12.5
+                   Q15.5 14.3 13 14"
+                fill="none"
+                stroke="#090b10"
+                stroke-width="1"
+                stroke-linecap="round"/>
+
+          <!-- Tail feathers -->
+          <path d="M13.5 15.1L9.2 19.5L13 18.7"
+                fill="currentColor"
+                stroke="none"/>
+
+          <!-- Legs -->
+          <path d="M14.2 15.4L13.8 17.2
+                   M16 15.3L16.1 17"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"/>
+
+        </svg>
+        <span>Woodpecker</span>
+      </a>
+
+      <!-- Stats -->
+      <a href="stats.html">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 19V5M4 19h17"/>
+          <path d="m7 15 4-4 3 2 6-7"/>
+        </svg>
+        <span>Stats</span>
+      </a>
+
+      <!-- Library -->
+      <a href="library.html">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5v-12Z"/>
+          <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20M8 7h8M8 10h6"/>
+        </svg>
+        <span>Library</span>
+      </a>
+
+      <!-- Game Review -->
+      <a href="game-review.html">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 3v18h18"/>
+          <path d="m7 14 4-4 3 3 6-7"/>
+          <path d="M16 6h4v4"/>
+        </svg>
+        <span>Game Review</span>
+      </a>
+
+    </nav>
+  </aside>
+
+  <!-- Homepage -->
+  <main class="main" id="home">
+
+    <div class="topline">
+
+      <div>
+        <div class="eyebrow">Chess training workspace</div>
+        <h1 class="heading">PuzzleForge</h1>
+        <p class="sub">
+          Solving chess puzzles is inevitable to become good at chess.
+        </p>
+      </div>
+
+      <!-- Authentication controls -->
+      <div class="auth-actions" id="authActions">
+
+        <span class="auth-user" id="authUserLabel">
+          Browsing as guest
+        </span>
+
+        <button class="auth-btn primary"
+                id="openAuthBtn"
+                type="button">
+          Login
+        </button>
+
+        <button class="auth-btn"
+                id="logoutBtn"
+                type="button"
+                hidden>
+          Log Out
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Homepage buttons -->
+    <section class="home-links">
+
+      <a href="dashboard.html" class="session-card">
+        <h3>01. DASHBOARD</h3>
+        <p>View your personal training dashboard.</p>
+        <span>Open Dashboard →</span>
+      </a>
+
+      <a href="puzzle-arena.html" class="session-card">
+        <h3>02. PUZZLE CONTRIVING</h3>
+        <p>Practice chess puzzles and improve your tactical skills.</p>
+        <span>Start Training →</span>
+      </a>
+
+      <a href="woodpecker.html" class="session-card">
+        <h3>03. WOODPECKER</h3>
+        <p>Practice your Woodpecker training cycle.</p>
+        <span>Open Woodpecker →</span>
+      </a>
+
+      <a href="stats.html" class="session-card">
+        <h3>04. STATS</h3>
+        <p>Explore your chess training statistics and progress.</p>
+        <span>View Stats →</span>
+      </a>
+
+      <a href="library.html" class="session-card">
+        <h3>05. LIBRARY</h3>
+        <p>Browse and explore your puzzle collection.</p>
+        <span>Open Library →</span>
+      </a>
+
+      <!-- Game Review Homepage Card -->
+      <a href="game-review.html"
+         class="session-card game-review-card">
+
+        <h3>06. GAME REVIEW</h3>
+
+        <p>
+          Analyze your chess games with the proprietary review engine.
+        </p>
+
+        <span>Review Your Game →</span>
+
+      </a>
+
+    </section>
+
+    <!-- Total website visits -->
+    <section class="visitor-counter-card" aria-label="Website visitor count">
+      <div>
+        <h3>Website Visitors</h3>
+        <p>Total visits to PuzzleForge</p>
+      </div>
+      <div class="counterapi"
+           ns="shayaankabir180.github.io/PuzzleForge"
+           key="puzzleforge-total-visits"
+           action="view"
+           noIcon="true"
+           noCss="true"
+           label="visits"
+           style="min-height:32px">
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Google authentication modal -->
+<div class="auth-overlay"
+     id="authOverlay"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="authTitle">
+
+  <div class="auth-dialog">
+
+    <button class="auth-close"
+            id="closeAuthBtn"
+            type="button"
+            aria-label="Close">
+      &times;
+    </button>
+
+    <h2 id="authTitle">Welcome to PuzzleForge</h2>
+
+    <p>
+      Sign in with your Google account to sync your profile,
+      puzzle progress and Woodpecker records across devices.
+    </p>
+
+    <div class="auth-form-actions">
+      <button class="auth-btn primary"
+              id="googleAuthBtn"
+              type="button">
+        Continue with Google
+      </button>
+    </div>
+
+    <div class="auth-message"
+         id="authMessage"
+         role="status"
+         aria-live="polite">
+    </div>
+
+  </div>
+</div>
+
+<!-- Shared visitor counter (no account or API key required) -->
+<script src="https://counterapi.com/c.js?ns=shayaankabir180.github.io%2FPuzzleForge" async></script>
+
+<!-- Firebase compatibility SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<!-- Shared PuzzleForge Firebase layer -->
+<script src="firebase-cloud.js"></script>
+
+<script>
+(function(){
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+let currentUser = null;
+
+const authOverlay = $("authOverlay");
+const authMessage = $("authMessage");
+
+function showAuthMessage(message,isError){
+  authMessage.textContent = message;
+  authMessage.style.color = isError ? "#e5a09a" : "#a9c99b";
+}
+
+function openAuth(){
+  authOverlay.classList.add("open");
+  showAuthMessage("",false);
+}
+
+function closeAuth(){
+  authOverlay.classList.remove("open");
+}
+
+$("openAuthBtn").addEventListener("click",openAuth);
+
+$("closeAuthBtn").addEventListener("click",closeAuth);
+
+authOverlay.addEventListener("click",event=>{
+  if(event.target === authOverlay){
+    closeAuth();
+  }
+});
+
+document.addEventListener("keydown",event=>{
+  if(event.key === "Escape"){
+    closeAuth();
+  }
+});
+
+/* Google sign-in */
+$("googleAuthBtn").addEventListener("click",async()=>{
+
+  if(!window.PF){
+    showAuthMessage(
+      "Firebase could not load. Please refresh the page.",
+      true
+    );
+    return;
+  }
+
+  const button = $("googleAuthBtn");
+
+  button.disabled = true;
+  showAuthMessage("Connecting to Google…",false);
+
+  try{
+    await window.PF.signIn();
+
+    showAuthMessage("Signed in successfully.",false);
+    closeAuth();
+
+  }catch(error){
+    console.error("Google sign-in error:",error);
+
+    showAuthMessage(
+      error.message || "Google sign-in failed. Please try again.",
+      true
+    );
+
+  }finally{
+    button.disabled = false;
+  }
+});
+
+/* Sign out */
+$("logoutBtn").addEventListener("click",async()=>{
+
+  if(!window.PF){
+    return;
+  }
+
+  try{
+    await window.PF.signOut();
+
+  }catch(error){
+    console.error("Sign-out error:",error);
+
+    window.alert(
+      "Could not log out: " +
+      (error.message || "Please try again.")
+    );
+  }
+});
+
+/* Update login state */
+function renderAuthState(user){
+
+  currentUser = user || null;
+
+  $("authUserLabel").textContent = user
+    ? (user.displayName || user.email || "Signed in")
+    : "Browsing as guest";
+
+  $("openAuthBtn").hidden = !!user;
+  $("logoutBtn").hidden = !user;
+
+  if(user){
+    closeAuth();
+  }
+}
+
+/* Listen for Firebase authentication events */
+window.addEventListener("puzzleforge:auth",event=>{
+
+  const user =
+    event.detail &&
+    Object.prototype.hasOwnProperty.call(event.detail,"user")
+      ? event.detail.user
+      : (window.PF ? window.PF.user : null);
+
+  renderAuthState(user);
+});
+
+/* Initialize Firebase authentication */
+async function initialize(){
+
+  if(!window.PF){
+
+    $("authUserLabel").textContent =
+      "Authentication unavailable";
+
+    $("openAuthBtn").disabled = true;
+
+    return;
+  }
+
+  try{
+
+    if(
+      window.PF.authReady &&
+      typeof window.PF.authReady.then === "function"
+    ){
+      await window.PF.authReady;
+    }
+
+    currentUser = window.PF.user || null;
+
+    renderAuthState(currentUser);
+
+  }catch(error){
+
+    console.error("Firebase initialization error:",error);
+
+    $("authUserLabel").textContent =
+      "Authentication unavailable";
+  }
+}
+
+initialize();
+
+})();
+</script>
+
+</body>
+</html>
